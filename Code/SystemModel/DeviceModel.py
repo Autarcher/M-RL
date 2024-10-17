@@ -1,5 +1,7 @@
 import math
-from TaskModel import TaskNode
+import random
+from Code.SystemModel.TaskModel import TaskNode
+from Code.SystemModel.TaskDAG import TaskDAG
 
 class Device:
     def __init__(self, coordinates, computing_speed, channel_gain, available_time = 0):
@@ -69,23 +71,67 @@ class Device:
         """
         return self.calculate_computation_time(task.computation_size)
 
-    def offload_task(self, task, other_coordinates):
+    def offload_task(self, ready_task, devices):
         """
         卸载任务到设备，更新设备的可获得时间
         :param task: TaskNode 对象，包含任务数据量和计算量
         :param other_coordinates: 任务发起方的位置坐标 (x, y)
         :return: 任务完成后的新可获得时间
         """
-        # 计算任务完成所需的总时间（传输 + 计算）
-        task_time = self.calculate_total_task_time(task, other_coordinates)
+        best_time = float('inf')
+        best_device = None
+        best_device_index = -1
+
+        task_node, app_device, arriving_time, node_id, appID = ready_task
+        #寻找最优卸载设备
+        for device_index, device_tuple in enumerate(devices):
+            # 获取设备实例和设备信息
+            other_device, device_type, device_id = device_tuple
+            # 如果卸载设备号和任务所属设备号相等
+            if app_device == device_index:
+                task_time =other_device.calculate_local_task_time(task_node)
+            else:
+                # 计算任务完成所需的总时间（传输 + 计算）
+                task_time = other_device.calculate_total_task_time(task_node, other_device.coordinates)
+
+            # 更新最优设备和最小总时间
+            if task_time < best_time:
+                best_time = task_time
+                best_device = other_device
+                best_device_index = device_index
 
         # 将任务总时间加到设备的可获得时间上
-        self.available_time += task_time
-        return self.available_time
+        if best_device is not None:
+            best_device.available_time += best_time
+            print(
+                f"Task is offloaded to Device {best_device_index} with updated available time: {best_device.available_time:.2f} seconds")
+        return best_device.available_time, best_device #用于后面计算任务的响应时间
 
     def offload_local_task(self, task):
         task_time = self.calculate_local_task_time(task)
-        self.available_time += task_time
+        return self.available_time
+
+    def initialize_task_dag(self, task_type, args, env): #产生任务后会成为Env的一部分向Env中
+        """
+        初始化任务DAG。
+        :param task_type: DAG类型。
+        :param args: 任务DAG参数。
+        """
+        if task_type == 'task_type1':
+            task_dag = TaskDAG(num_nodes=args.num_nodes1, data_range=args.data_range,
+                               computation_range=args.computation_range,
+                               deadline_range=args.deadline_range, seed=args.seed1)
+        elif task_type == 'task_type2':
+            task_dag = TaskDAG(num_nodes=args.num_nodes2, data_range=args.data_range,
+                               computation_range=args.computation_range,
+                               deadline_range=args.deadline_range, seed=args.seed2)
+        elif task_type == 'task_type3':
+            task_dag = TaskDAG(num_nodes=args.num_nodes3, data_range=args.data_range,
+                               computation_range=args.computation_range,
+                               deadline_range=args.deadline_range, seed=args.seed3)
+
+        arrival_time = random.randint(0, 100)  # 随机生成任务到达时间
+        env.tasks.append((task_dag, task_type, 0, arrival_time))  # 第一个元素是任务的DAG图，第二个元素表示任务的所属设备，第三个是属于哪个设备，第四给变量表示为任务的到达时间
 
 # 主函数，创建设备和任务，选择最优设备进行任务卸载
 if __name__ == "__main__":

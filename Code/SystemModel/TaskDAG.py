@@ -1,8 +1,10 @@
 import random
-from TaskModel import TaskNode
-random.seed(1)
+from Code.SystemModel.TaskModel import TaskNode
+
+
+
 class TaskDAG:
-    def __init__(self, num_nodes, data_range, computation_range, deadline_range):
+    def __init__(self, num_nodes, data_range, computation_range, deadline_range, seed):
         """
         初始化DAG图，生成指定节点数量的任务节点。
         :param num_nodes: 任务节点的数量
@@ -10,14 +12,18 @@ class TaskDAG:
         :param computation_range: 计算量范围（如 (min_computation_size, max_computation_size)）
         :param deadline_range: 截止时间范围（如 (min_deadline, max_deadline)）
         """
+        random.seed(seed)
         self.num_nodes = num_nodes
         self.data_range = data_range
         self.computation_range = computation_range
         self.deadline_range = deadline_range
         self.nodes = []  # 存储所有生成的 TaskNode
-        self.adjacency_list = {}  # 存储DAG的邻接表，表示任务依赖关系
+        self.task_node_finished_flag = [] # 标识任务是否已经被完成
+        self.task_node_finished_time = [] # 记录子任务的完成时间
+        self.adjacency_list = {}  # 存储DAG的邻接表，表示任务的前驱节点
 
         self._generate_dag()
+        self._remove_redundant_dependencies()
 
     def _generate_dag(self):
         """
@@ -26,6 +32,8 @@ class TaskDAG:
         # 生成入口任务，数据量和计算量为0
         entry_task = TaskNode(0, 0, 0)
         self.nodes.append((0, entry_task))  # 节点编号为0
+        self.task_node_finished_flag.append(False)
+        self.task_node_finished_time.append(0)
         self.adjacency_list[0] = []  # 初始化入口任务的依赖关系
 
         # 生成指定数量的 TaskNode
@@ -37,57 +45,85 @@ class TaskDAG:
             # 创建 TaskNode 实例并添加到节点列表中
             task_node = TaskNode(data_size, computation_size, deadline)
             self.nodes.append((i, task_node))  # 节点编号从1开始
+            self.task_node_finished_flag.append(False)
+            self.task_node_finished_time.append(0)
             self.adjacency_list[i] = []
 
         # 创建出口任务，数据量和计算量为0
         exit_task = TaskNode(0, 0, 0)
         exit_task_id = self.num_nodes + 1
         self.nodes.append((exit_task_id, exit_task))
+        self.task_node_finished_flag.append(False)
+        self.task_node_finished_time.append(0)
         self.adjacency_list[exit_task_id] = []  # 出口任务的依赖关系
 
-        # 所有任务节点依赖于入口任务（编号为0）
+        # 使用新的逻辑生成依赖关系，确保生成合理的DAG结构
         for i in range(1, self.num_nodes + 1):
-            self.adjacency_list[0].append(i)  # 所有任务都依赖于入口任务
+            possible_dependencies = list(range(0, i))  # 节点可以依赖于之前的所有节点（包括入口任务）
+            num_dependencies = random.randint(1, min(3, len(possible_dependencies)))  # 随机选择1到3个前驱节点
+            dependencies = random.sample(possible_dependencies, num_dependencies)
+            self.adjacency_list[i] = dependencies
 
-        # 创建随机的依赖关系，确保没有循环（有向无环图的特性）
+        # 所有没有后继任务的节点（即没有其他任务依赖它们的）依赖于出口任务
         for i in range(1, self.num_nodes + 1):
-            num_dependencies = random.randint(0, i - 1)
-            dependencies = random.sample(range(1, i), num_dependencies)
-            for dep in dependencies:
-                self.adjacency_list[dep].append(i)
+            is_successor = False
+            for deps in self.adjacency_list.values():
+                if i in deps:
+                    is_successor = True
+                    break
+            if not is_successor:
+                self.adjacency_list[exit_task_id].append(i)  # 依赖出口任务
 
-        # 所有没有后继任务的节点依赖于出口任务
-        for i in range(1, self.num_nodes + 1):
-            if len(self.adjacency_list[i]) == 0:
-                self.adjacency_list[i].append(exit_task_id)
-
-    def print_dag_info(self):
+    def _remove_redundant_dependencies(self):
         """
-        打印DAG图的基本信息，包括每个节点的任务信息和依赖关系
+        移除冗余的依赖关系，确保每个任务节点只保留直接依赖关系
         """
-        print(f"DAG with {self.num_nodes + 2} nodes (including entry and exit nodes):")
-        for node_id, node in self.nodes:
-            if node_id == 0:
-                print(f"Task {node_id} (Entry Task):")
-            elif node_id == self.num_nodes + 1:
-                print(f"Task {node_id} (Exit Task):")
-            else:
-                print(f"Task {node_id}:")
+        for node in range(1, self.num_nodes + 1):
+            direct_dependencies = set(self.adjacency_list[node])
+            redundant_dependencies = set()
+            for dep in direct_dependencies:
+                for other_dep in direct_dependencies:
+                    if dep != other_dep and self._has_path(other_dep, dep):
+                        redundant_dependencies.add(dep)
+            self.adjacency_list[node] = list(direct_dependencies - redundant_dependencies)
 
-            node.print_task_info()
-            dependents = self.adjacency_list[node_id]
-            if dependents:
-                print("Dependent on:")
-                for dep_id in dependents:
-                    if dep_id == 0:
-                        print(f"  - Task {dep_id} (Entry Task)")
-                    elif dep_id == self.num_nodes + 1:
-                        print(f"  - Task {dep_id} (Exit Task)")
-                    else:
-                        print(f"  - Task {dep_id}")
+    def _has_path(self, start, end):
+        """
+        检查从节点 start 是否可以到达节点 end
+        :param start: 起始节点
+        :param end: 目标节点
+        :return: 如果存在路径则返回 True，否则返回 False
+        """
+        visited = set()
+        stack = [start]
+
+        while stack:
+            node = stack.pop()
+            if node == end:
+                return True
+            if node not in visited:
+                visited.add(node)
+                stack.extend(self.adjacency_list[node])
+
+        return False
+
+    def print_adjacency_list(self):
+        """
+        打印DAG图的邻接表（依赖关系：存储依赖于哪些任务）
+        """
+        print(
+            f"Adjacency List (Dependencies) of the DAG with {self.num_nodes + 2} nodes (including entry and exit nodes):")
+        for node_id, dependencies in self.adjacency_list.items():
+            if dependencies:
+                print(f"Task {node_id} depends on: {', '.join(map(str, dependencies))}")
             else:
-                print("No dependencies.")
-            print()
+                print(f"Task {node_id} has no dependencies.")
+
+        # 打印每个节点的 TaskNode 信息
+        for node_id, task_node in self.nodes:
+            print(f"\nTask {node_id} Information:")
+            task_node.print_task_info()
+
 
 # 示例用法
 if __name__ == "__main__":
@@ -97,7 +133,8 @@ if __name__ == "__main__":
     deadline_range = (100, 1000)  # 截止时间范围：100秒到1000秒
 
     # 生成一个包含5个任务节点的DAG（总共7个节点，包括入口和出口任务）
-    task_dag = TaskDAG(num_nodes=5, data_range=data_range, computation_range=computation_range, deadline_range=deadline_range)
+    task_dag = TaskDAG(num_nodes=5, data_range=data_range, computation_range=computation_range,
+                       deadline_range=deadline_range, seed = 1)
 
-    # 打印DAG图的信息
-    task_dag.print_dag_info()
+    # 打印DAG图的邻接表（存储依赖于哪些任务）
+    task_dag.print_adjacency_list()
