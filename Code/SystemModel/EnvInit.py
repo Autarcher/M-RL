@@ -42,10 +42,11 @@ class RLState:
                     # 检查所有依赖任务是否都已完成
                     all_dependencies_finished = all(app_DAG.task_node_finished_flag[dep] for dep in dependencies)
 
-                    if all_dependencies_finished:
+                    # 如果任务已经在Running_tasks队列但还未完成则不进入ready_tasks队列
+                    if all_dependencies_finished and app_DAG.task_node_scheduled_flag[node_id] == False:
                         # 所有依赖任务完成，将任务添加到 ready_tasks 中
                         self.ready_tasks.append((task_node, app_device, arriving_time, node_id, appID))
-                    else:
+                    elif all_dependencies_finished == False:
                         # 如果任务有未完成的依赖任务，放入 pending_tasks
                         self.pending_tasks.append((task_node, app_device, arriving_time, node_id, appID))
 
@@ -179,6 +180,8 @@ class EnvInit:
             #卸载任务优先级最高的一个任务  这里要记得计算任务的响应时间
             running_time, offload_device = self.devices[app_device][0].offload_task(state.ready_tasks[action_index], self.devices)
             self.running_tasks.append((task_node, offload_device, state.cur_time + running_time, node_id, appID))
+            task_dag.task_node_scheduled_flag[node_id] = True
+            task_dag.task_node_scheduled_seq.append(node_id)
             print("执行的任务")
             print(f"task_node: {task_node}\n"
                   f"app_device: {app_device}\n"
@@ -202,6 +205,11 @@ class EnvInit:
                 task_node, _, finished_time, node_id, appID = running_task
                 self.tasks[appID][0].task_node_finished_flag[node_id] = True
                 self.tasks[appID][0].task_node_finished_time[node_id] = finished_time
+
+                #如果时出口任务那么记录这个任务的结束时间
+                if node_id == len(self.tasks[appID][0].nodes) - 1:
+                    self.tasks[appID][0].app_finished_time = finished_time
+
                 self.running_tasks.remove(running_task)
         state = self.get_state()
         return state
@@ -302,7 +310,7 @@ if __name__ == "__main__":
     # device0发出三个任务请求初始化三个任务DAG每类DAG各一种
     device0 = env.devices[0][0]
     device0.initialize_task_dag('task_type1', args, env)
-    # device0.initialize_task_dag('task_type2', args, env)
+    device0.initialize_task_dag('task_type2', args, env)
     # device0.initialize_task_dag('task_type3', args, env)
 
 
@@ -347,22 +355,33 @@ if __name__ == "__main__":
     actions = state.generate_actions()
     state.print_actions(actions)
     print("------------------------------测试get_next_state函数--------------------------------------")
-    env.update_running_tasks(state, 0)
-    state = env.get_next_state()
-    env.update_running_tasks(state, 0)
-    env.update_running_tasks(state, 1)
-    for i in range(100):
+    # env.update_running_tasks(state, 0)
+    # state = env.get_next_state()
+    # env.update_running_tasks(state, 0)
+    # env.update_running_tasks(state, 1)
+    for i in range(300):
         state = env.get_next_state()
+        actions = state.generate_actions()
+        if actions:
+            env.update_running_tasks(state, 0)
         # env.update_running_tasks(state, 0)
         for task_tuple in state.app_list:
             app_DAG, app_type, app_device, arriving_time = task_tuple
-            print("***************************************************")
+            print("*************************+++++++++其中一个任务++++++++**************************")
             print("app种类" + str(app_type))
             print("所属设备"+str(app_device))
             print("到达时间"+str(arriving_time))
             app_DAG.print_adjacency_list()
+            print("scheduled flag:")
+            print(app_DAG.task_node_scheduled_flag)
+            print("finished flag:")
             print(app_DAG.task_node_finished_flag)
+            print("finished time:")
             print(app_DAG.task_node_finished_time)
+            print("scheduled seq:")
+            print(app_DAG.task_node_scheduled_seq)
+            print("app finished time")
+            print(app_DAG.app_finished_time)
 
 
         print("***************************************************")
@@ -377,7 +396,7 @@ if __name__ == "__main__":
             actions = state.generate_actions()
             state.print_actions(actions)
         env.current_time += 1
-        print(f"+++++++++++++++++++{env.current_time}++++++++++++++++++")
+        print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
         actions = state.generate_actions()
     # print("************************执行任务***************************")
     # state = env.get_next_state(state, 0)

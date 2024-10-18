@@ -26,7 +26,7 @@ Environment里要有，任务队列，设备队列。观察函数（生成状态
 
 ​	TaskDAG中的每一个node是一个二元组，第一个值是node的index第二个为一个TaskNode节点
 
-
+​	Task里面再加一个调度rank队列，每次schduling时向里面加入任务以记录调度顺序
 
 ### EnvInit有关：
 

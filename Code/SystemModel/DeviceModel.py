@@ -131,7 +131,7 @@ class Device:
                                deadline_range=args.deadline_range, seed=args.seed3)
 
         arrival_time = random.randint(0, 100)  # 随机生成任务到达时间
-        env.tasks.append((task_dag, task_type, 0, arrival_time))  # 第一个元素是任务的DAG图，第二个元素表示任务的所属设备，第三个是属于哪个设备，第四给变量表示为任务的到达时间
+        env.tasks.append((task_dag, task_type, 0, env.current_time))  # 第一个元素是任务的DAG图，第二个元素表示任务的所属设备，第三个是属于哪个设备，第四给变量表示为任务的到达时间
 
 # 主函数，创建设备和任务，选择最优设备进行任务卸载
 if __name__ == "__main__":

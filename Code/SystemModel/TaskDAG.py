@@ -18,8 +18,12 @@ class TaskDAG:
         self.computation_range = computation_range
         self.deadline_range = deadline_range
         self.nodes = []  # 存储所有生成的 TaskNode
-        self.task_node_finished_flag = [] # 标识任务是否已经被完成
-        self.task_node_finished_time = [] # 记录子任务的完成时间
+        self.task_node_finished_flag = []  # 标识任务是否已经被完成
+        self.task_node_finished_time = []  # 记录子任务的完成时间
+        self.task_node_scheduled_flag = [] # 标识任务是否已经在running_tasks队列
+        self.task_node_scheduled_seq = []  #标识任务的调度顺序
+        self.app_finished_time = float("inf")         #标识整个app的完成时间
+
         self.adjacency_list = {}  # 存储DAG的邻接表，表示任务的前驱节点
 
         self._generate_dag()
@@ -33,6 +37,7 @@ class TaskDAG:
         entry_task = TaskNode(0, 0, 0)
         self.nodes.append((0, entry_task))  # 节点编号为0
         self.task_node_finished_flag.append(False)
+        self.task_node_scheduled_flag.append(False)
         self.task_node_finished_time.append(0)
         self.adjacency_list[0] = []  # 初始化入口任务的依赖关系
 
@@ -46,6 +51,7 @@ class TaskDAG:
             task_node = TaskNode(data_size, computation_size, deadline)
             self.nodes.append((i, task_node))  # 节点编号从1开始
             self.task_node_finished_flag.append(False)
+            self.task_node_scheduled_flag.append(False)
             self.task_node_finished_time.append(0)
             self.adjacency_list[i] = []
 
@@ -54,6 +60,7 @@ class TaskDAG:
         exit_task_id = self.num_nodes + 1
         self.nodes.append((exit_task_id, exit_task))
         self.task_node_finished_flag.append(False)
+        self.task_node_scheduled_flag.append(False)
         self.task_node_finished_time.append(0)
         self.adjacency_list[exit_task_id] = []  # 出口任务的依赖关系
 
