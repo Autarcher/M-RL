@@ -164,14 +164,14 @@ class EnvInit:
         self.check_requirements()
 
     def get_state(self):
-        state = RLState(env.devices, env.tasks, self.current_time)
+        state = RLState(self.devices, self.tasks, self.current_time)
 
         return state
 
 
     def update_running_tasks(self, state, action_index):
 
-        if 0 <= action_index < len(state.ready_tasks):
+        if -1 <= action_index < len(state.ready_tasks):
             task_node, app_device, arriving_time, node_id, appID = state.ready_tasks[action_index]
             # 在 tasks 列表中找到对应的 TaskDAG
 
@@ -311,7 +311,10 @@ if __name__ == "__main__":
     device0 = env.devices[0][0]
     device0.initialize_task_dag('task_type1', args, env)
     device0.initialize_task_dag('task_type2', args, env)
-    # device0.initialize_task_dag('task_type3', args, env)
+    device0.initialize_task_dag('task_type3', args, env)
+    device0.initialize_task_dag('task_type1', args, env)
+    device0.initialize_task_dag('task_type2', args, env)
+    device0.initialize_task_dag('task_type3', args, env)
 
 
     # # 打印设备信息
@@ -359,11 +362,11 @@ if __name__ == "__main__":
     # state = env.get_next_state()
     # env.update_running_tasks(state, 0)
     # env.update_running_tasks(state, 1)
-    for i in range(300):
+    for i in range(1000):
         state = env.get_next_state()
         actions = state.generate_actions()
         if actions:
-            env.update_running_tasks(state, 0)
+            env.update_running_tasks(state, -1)
         # env.update_running_tasks(state, 0)
         for task_tuple in state.app_list:
             app_DAG, app_type, app_device, arriving_time = task_tuple
@@ -421,4 +424,14 @@ if __name__ == "__main__":
     # actions = state.generate_actions()
     # state.print_actions(actions)
     print("*******************************测试get_next_state函数完毕*******************************")
+
+
+    sum_time = 0
+    for index, app in enumerate(env.tasks):
+        appDAG, _, _, _, = app
+        print(f"第{index}个任务的完成时间是")
+        print(appDAG.app_finished_time)
+        sum_time += appDAG.app_finished_time
+
+    print(f"总响应时间:{sum_time/len(env.tasks)}")
 

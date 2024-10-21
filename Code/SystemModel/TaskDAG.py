@@ -22,12 +22,17 @@ class TaskDAG:
         self.task_node_finished_time = []  # 记录子任务的完成时间
         self.task_node_scheduled_flag = [] # 标识任务是否已经在running_tasks队列
         self.task_node_scheduled_seq = []  #标识任务的调度顺序
-        self.app_finished_time = float("inf")         #标识整个app的完成时间
+        self.app_finished_time = 0         #标识整个app的完成时间
 
         self.adjacency_list = {}  # 存储DAG的邻接表，表示任务的前驱节点
 
+        # 新增两个数组记录入度和出度
+        self.in_degree = [0] * (num_nodes + 2)  # 每个节点的入度
+        self.out_degree = [0] * (num_nodes + 2) # 每个节点的出度
+
         self._generate_dag()
         self._remove_redundant_dependencies()
+        self._calculate_degrees()
 
     def _generate_dag(self):
         """
@@ -94,6 +99,20 @@ class TaskDAG:
                         redundant_dependencies.add(dep)
             self.adjacency_list[node] = list(direct_dependencies - redundant_dependencies)
 
+    def _calculate_degrees(self):
+        """
+        计算每个节点的入度和出度
+        """
+        # 重置入度和出度数组
+        self.in_degree = [0] * (self.num_nodes + 2)
+        self.out_degree = [0] * (self.num_nodes + 2)
+
+        # 计算入度和出度
+        for node, dependencies in self.adjacency_list.items():
+            self.in_degree[node] = len(dependencies)
+            for dep in dependencies:
+                self.out_degree[dep] += 1
+
     def _has_path(self, start, end):
         """
         检查从节点 start 是否可以到达节点 end
@@ -130,6 +149,15 @@ class TaskDAG:
         for node_id, task_node in self.nodes:
             print(f"\nTask {node_id} Information:")
             task_node.print_task_info()
+
+        # 打印每个节点的入度和出度
+        print("\nIn-degree for each task:")
+        for i, in_deg in enumerate(self.in_degree):
+            print(f"Task {i}: {in_deg} in-degree")
+
+        print("\nOut-degree for each task:")
+        for i, out_deg in enumerate(self.out_degree):
+            print(f"Task {i}: {out_deg} out-degree")
 
 
 # 示例用法
