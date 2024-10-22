@@ -4,7 +4,7 @@ from Code.SystemModel.TaskModel import TaskNode
 
 
 class TaskDAG:
-    def __init__(self, num_nodes, data_range, computation_range, deadline_range, seed):
+    def __init__(self, num_nodes, data_range, computation_range, deadline_range, seed, current_time):
         """
         初始化DAG图，生成指定节点数量的任务节点。
         :param num_nodes: 任务节点的数量
@@ -17,6 +17,8 @@ class TaskDAG:
         self.data_range = data_range
         self.computation_range = computation_range
         self.deadline_range = deadline_range
+        # self.arriving_time = current_time #任务的发起时间
+
         self.nodes = []  # 存储所有生成的 TaskNode
         self.task_node_finished_flag = []  # 标识任务是否已经被完成
         self.task_node_finished_time = []  # 记录子任务的完成时间

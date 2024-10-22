@@ -2,7 +2,7 @@
 import random
 import numpy as np
 
-from src.util.sum_tree import SumTree
+from Code.TaskSchedulingModel.util.sum_tree import SumTree
 
 
 class PrioritizedReplayMemory:

@@ -94,6 +94,17 @@ class EnvInit:
         self.tasks = []         #其中每个元素是一个四元组，第一个元素是任务的DAG图，第二个元素表示任务种类，第三个元素表示任务的所属设备，第四个变量表示为任务的到达时间
         self.running_tasks = [] #每个元素是一个五元组，包括任务节点本身,任务执行的设备，任务的完成执行时间，任务在AppDAG图内的ID和任务所属的AppID
         self.current_time = 0   #系统初始参考时间是0
+
+        self.t_add_runnings_tasks_num = 0
+        self.t_finished_tasks_num = 0
+        self.t_finished_apps_num = 0
+
+    def clear_t_record(self):
+        self.t_add_runnings_tasks_num = 0
+        self.t_finished_tasks_num = 0
+        self.t_finished_apps_num = 0
+
+
     def load_config(self):
         """
         加载配置文件。
@@ -182,6 +193,7 @@ class EnvInit:
             self.running_tasks.append((task_node, offload_device, state.cur_time + running_time, node_id, appID))
             task_dag.task_node_scheduled_flag[node_id] = True
             task_dag.task_node_scheduled_seq.append(node_id)
+            self.t_add_runnings_tasks_num += 1
             print("执行的任务")
             print(f"task_node: {task_node}\n"
                   f"app_device: {app_device}\n"
@@ -205,10 +217,12 @@ class EnvInit:
                 task_node, _, finished_time, node_id, appID = running_task
                 self.tasks[appID][0].task_node_finished_flag[node_id] = True
                 self.tasks[appID][0].task_node_finished_time[node_id] = finished_time
+                self.t_finished_tasks_num += 1
 
                 #如果时出口任务那么记录这个任务的结束时间
                 if node_id == len(self.tasks[appID][0].nodes) - 1:
                     self.tasks[appID][0].app_finished_time = finished_time
+                    self.t_finished_apps_num += 1
 
                 self.running_tasks.remove(running_task)
         state = self.get_state()
@@ -272,10 +286,12 @@ def parse_arguments():
 
     # Common TaskDAG parameters
     parser.add_argument('--data_range', type=tuple, default=(100, 1000), help="数据量范围：100字节到1000字节")
-    parser.add_argument('--computation_range', type=tuple, default=(1e8, 1e10), help="计算量范围：1亿FLOPs到100亿FLOPs")
+    #default=(1e8, 1e10)
+    parser.add_argument('--computation_range', type=tuple, default=(1e6, 1e8), help="计算量范围：1亿FLOPs到100亿FLOPs")
     parser.add_argument('--deadline_range', type=tuple, default=(100, 1000), help="截止时间范围：100秒到1000秒")
 
     # Hyper parameters
+    parser.add_argument('--seed', type=int, default=1, help="模型的初始化种子")
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--learning_rate', type=float, default=0.000005)
     parser.add_argument('--n_step', type=int, default=600)
@@ -362,11 +378,24 @@ if __name__ == "__main__":
     # state = env.get_next_state()
     # env.update_running_tasks(state, 0)
     # env.update_running_tasks(state, 1)
-    for i in range(1000):
-        state = env.get_next_state()
+    for i in range(800):
+        # 假设这个部分在每秒的循环中执行
+        #任务随即到达
+        if random.random() < 0.1:  # 10% 的概率
+            device0.initialize_task_dag('task_type1', args, env)
+
+        if random.random() < 0.1:  # 10% 的概率
+            device0.initialize_task_dag('task_type2', args, env)
+
+        if random.random() < 0.1:  # 10% 的概率
+            device0.initialize_task_dag('task_type3', args, env)
+
+        state = env.get_next_state() #这个里面会判断app是否已经完成
         actions = state.generate_actions()
         if actions:
-            env.update_running_tasks(state, -1)
+            # random.seed(args.seed)
+            random_action = random.randint(0, len(actions) - 1)
+            env.update_running_tasks(state, random_action)
         # env.update_running_tasks(state, 0)
         for task_tuple in state.app_list:
             app_DAG, app_type, app_device, arriving_time = task_tuple
@@ -400,7 +429,15 @@ if __name__ == "__main__":
             state.print_actions(actions)
         env.current_time += 1
         print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
+
+        print(f"+++++++++++++++++++------奖励测试-------+++++++++++++++++++++++")
         actions = state.generate_actions()
+        explore_step = 20
+        if env.current_time % explore_step == 0:
+            reward = (env.t_finished_apps_num * 10) + (env.t_finished_tasks_num * 1) + (
+                        env.t_add_runnings_tasks_num * 1)
+            print(f"第{env.current_time / explore_step}次完成探索时的奖励：{reward} ")
+            env.clear_t_record()
     # print("************************执行任务***************************")
     # state = env.get_next_state(state, 0)
     # for task in state.ready_tasks:
@@ -423,15 +460,19 @@ if __name__ == "__main__":
     #     print(app_DAG.task_node_finished_time)
     # actions = state.generate_actions()
     # state.print_actions(actions)
+    #Exploration setp
     print("*******************************测试get_next_state函数完毕*******************************")
 
 
     sum_time = 0
+    finished_tasks_num = 0
     for index, app in enumerate(env.tasks):
-        appDAG, _, _, _, = app
-        print(f"第{index}个任务的完成时间是")
-        print(appDAG.app_finished_time)
-        sum_time += appDAG.app_finished_time
-
-    print(f"总响应时间:{sum_time/len(env.tasks)}")
+        appDAG, _, _, arriving_time = app
+        print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
+              f"响应时间(任务完成时间-任务到达时间)是{appDAG.app_finished_time - arriving_time}")
+        if appDAG.app_finished_time > 0:
+            sum_time += appDAG.app_finished_time - arriving_time
+            finished_tasks_num += 1
+    print(f"完成的任务数{finished_tasks_num}")
+    print(f"平均响应时间:{sum_time/finished_tasks_num}")
 

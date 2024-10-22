@@ -27,7 +27,7 @@ class Trainer:
 
         self.args = args
         np.random.seed(self.args.seed)
-        self.n_action = args.n_task * args.n_device * (args.n_device + args.n_h_max)
+        # self.n_action = args.n_task * args.n_device * (args.n_device + args.n_h_max)
 
         self.num_node_feats = args.num_node_feats
         self.reward_scaling = 0.001
@@ -40,6 +40,84 @@ class Trainer:
         print("[INFO] NUMBER OF FEATURES")
         print("[INFO] n_node_feat: %d" % self.num_node_feats)
         print("***********************************************************")
+
+    def run_training(self, env, state):
+        """
+        Run de main loop for training the model
+        """
+        #  Generate a random instance
+        if self.args.plot_training:
+            iter_list = []
+            reward_list = []
+
+        self.initialize_memory(env)
+        print('[INFO]', 'iter', 'time', 'avg_reward_learning', 'loss', "beta")
+
+        cur_best_reward = MIN_VAL
+
+        for i in range(self.args.n_episode):
+
+            loss, beta = self.run_episode(i, False, env)
+
+            #  We first evaluate the validation step every 10 episodes, until 100, then every 100 episodes.
+            if (i % 10 == 0 and i < 101) or i % 100 == 0:
+
+                avg_reward = 0.0
+                for j in range(self.validation_len):
+                    avg_reward += self.evaluate_instance(j, env)
+
+                avg_reward = avg_reward / self.validation_len
+
+                cur_time = round(time.time() - start_time, 2)
+
+                print('[DATA]', i, cur_time, avg_reward, loss, beta)
+
+                sys.stdout.flush()
+
+                if self.args.plot_training:
+                    iter_list.append(i)
+                    reward_list.append(avg_reward)
+                    plt.clf()
+
+                    plt.plot(iter_list, reward_list, linestyle="-", label="DQN", color='y')
+
+                    plt.legend(loc=3)
+                    out_fig_file = '%s/training_curve_reward.png' % self.args.save_dir
+                    out_csv_file = '%s/training_data.csv' % self.args.save_dir
+                    if not os.path.exists(self.args.save_dir):
+                        os.makedirs(self.args.save_dir)
+                    plt.savefig(out_fig_file)
+
+                    # save the data
+                    with open(out_csv_file, mode='w', newline='') as file:
+                        writer = csv.writer(file)
+                        # 写入标题
+                        writer.writerow(['Iteration', 'Reward'])
+                        # 写入数据
+                        for i, reward in zip(iter_list, reward_list):
+                            writer.writerow([i, reward])
+
+                fn = "iter_%d_model.pth.tar" % i
+
+                #  We record only the model that is better on the validation set wrt. the previous model
+                #  We nevertheless record a model every 10000 episodes
+                if avg_reward >= cur_best_reward:
+                    cur_best_reward = avg_reward
+                    self.brain.save(folder=self.args.save_dir, filename=fn)
+                elif i % 10000 == 0:
+                    self.brain.save(folder=self.args.save_dir, filename=fn)
+
+    def initialize_memory(self, env):
+        """
+        Initialize the replay memory with random episodes and a random selection
+        """
+
+        while self.init_memory_counter < MEMORY_CAPACITY:
+            self.run_episode(0, True, env)
+
+        print("[INFO] Memory Initialized")
+
+
 
 
     def data_initialization(self, state, env):
@@ -135,6 +213,7 @@ def parse_arguments():
     parser.add_argument('--deadline_range', type=tuple, default=(100, 1000), help="截止时间范围：100秒到1000秒")
 
     # Hyper parameters
+    parser.add_argument('--seed', type=int, default=1, help="模型的初始化种子")
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--learning_rate', type=float, default=0.000005)
     parser.add_argument('--n_step', type=int, default=600)
