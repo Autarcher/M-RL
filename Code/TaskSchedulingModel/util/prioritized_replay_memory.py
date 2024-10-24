@@ -59,8 +59,9 @@ class PrioritizedReplayMemory:
         :param p: the probability
         :return: the importance sampling weight
         """
-
-        return (p * self.capacity) ** (-self.b)  # equivalent to ((1./self.capacity) * (1./p)) ** self.b
+        epsilon = 1e-6  # 一个很小的正数，防止除以零
+        adjusted_p = max(p, epsilon)
+        return (adjusted_p * self.capacity) ** (-self.b)  # equivalent to ((1./self.capacity) * (1./p)) ** self.b
 
     def size(self):
         return self.tree.total();
@@ -82,6 +83,7 @@ class PrioritizedReplayMemory:
         for i in range(n):
             lb = segment * i
             ub = segment * (i + 1)
+            random.seed(None)
             s = random.uniform(lb, ub)
             (idx, p, data) = self.tree.get(s)
             sampling_prob = p / self.tree.total()

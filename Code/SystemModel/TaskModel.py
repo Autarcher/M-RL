@@ -7,7 +7,8 @@ class TaskNode:
         :param deadline: 任务的截止时间（单位可以是秒或时间戳）
         """
         self.ready_time = 0         #任务的可执行时间表示
-        self.is_finished_task = 0
+        self.is_end_task = 0        #任务是否为app出口任务
+        self.is_start_task = 0      #任务是否为app入口任务
         self.data_size = data_size  # 任务的数据量
         self.computation_size = computation_size  # 任务的计算量
         self.deadline = deadline  # 任务的截止时间

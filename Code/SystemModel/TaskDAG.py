@@ -42,6 +42,7 @@ class TaskDAG:
         """
         # 生成入口任务，数据量和计算量为0
         entry_task = TaskNode(0, 0, 0)
+        entry_task.is_start_task = 1
         self.nodes.append((0, entry_task))  # 节点编号为0
         self.task_node_finished_flag.append(False)
         self.task_node_scheduled_flag.append(False)
@@ -64,7 +65,7 @@ class TaskDAG:
 
         # 创建出口任务，数据量和计算量为0
         exit_task = TaskNode(0, 0, 0)
-        exit_task.is_finished_task = 1
+        exit_task.is_end_task = 1
         exit_task_id = self.num_nodes + 1
         self.nodes.append((exit_task_id, exit_task))
         self.task_node_finished_flag.append(False)

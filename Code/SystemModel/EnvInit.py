@@ -4,6 +4,8 @@ from Code.SystemModel.DeviceModel import Device
 import argparse
 import random
 
+
+
 class RLState:
     def __init__(self, device_list, app_list, cur_time):
         """
@@ -206,19 +208,20 @@ class EnvInit:
 
             #卸载任务优先级最高的一个任务  这里要记得计算任务的响应时间
             running_time, offload_device = self.devices[app_device][0].offload_task(state.ready_tasks[action_index], self.devices)
+
             self.running_tasks.append((task_node, offload_device, state.cur_time + running_time, node_id, appID))
             task_dag.task_node_scheduled_flag[node_id] = True
             task_dag.task_node_scheduled_seq.append(node_id)
             self.t_add_runnings_tasks_num += 1
-            print("执行的任务")
-            print(f"task_node: {task_node}\n"
-                  f"app_device: {app_device}\n"
-                  f"arriving_time: {arriving_time}\n"
-                  f"offload_device: {offload_device}\n"
-                  f"finish_time: {state.cur_time + running_time}\n"
-                  f"node_id: {node_id}\n"
-                  f"appID: {appID}")
-            print("------------------")
+            # print("执行的任务")
+            # print(f"task_node: {task_node}\n"
+            #       f"app_device: {app_device}\n"
+            #       f"arriving_time: {arriving_time}\n"
+            #       f"offload_device: {offload_device}\n"
+            #       f"finish_time: {state.cur_time + running_time}\n"
+            #       f"node_id: {node_id}\n"
+            #       f"appID: {appID}\n")
+            # print("---------执行的任务信息结束---------")
         else:
             print("Invalid action index.")
 
@@ -405,25 +408,44 @@ if __name__ == "__main__":
     # state = env.get_next_state()
     # env.update_running_tasks(state, 0)
     # env.update_running_tasks(state, 1)
-    for i in range(200):
+    seed = 4
+    for i in range(50):
         # 假设这个部分在每秒的循环中执行
+        # 系统是忙的
+        # device0.initialize_task_dag('task_type3', args, env)
         #任务随即到达
-        if random.random() < 0.1:  # 10% 的概率
+        random.seed(seed)
+        random1 = random.random()
+        random2 = random.random()
+        random3 = random.random()
+        count = 0
+        if random1 < 0.33:  # 10% 的概率
             device0.initialize_task_dag('task_type1', args, env)
+            count = count + 1
 
-        if random.random() < 0.1:  # 10% 的概率
+        if random2 < 0.33:  # 10% 的概率
             device0.initialize_task_dag('task_type2', args, env)
+            count = count + 1
 
-        if random.random() < 0.1:  # 10% 的概率
+        if random3 < 0.33:  # 10% 的概率
             device0.initialize_task_dag('task_type3', args, env)
+            count = count + 1
+        if count < 1:
+            device0.initialize_task_dag('task_type1', args, env)
+        print(f"+++到达任务数+++{count}")
+        count = 0
 
         if actions:
             # random.seed(args.seed)
+            random.seed(seed)
             random_action = random.randint(0, len(actions) - 1)
-            env.update_running_tasks(state, random_action)
+            # env.update_running_tasks(state, random_action)
+            action = random_action
+            # action = 0
         else:
             action = -2
-        state, reward = env.get_next_state_and_reward(state, random_action) #这个里面会判断app是否已经完成
+
+        state, reward = env.get_next_state_and_reward(state, action) #这个里面会判断app是否已经完成
         actions = state.generate_actions()
         # env.update_running_tasks(state, 0)
         for task_tuple in state.app_list:
@@ -459,7 +481,6 @@ if __name__ == "__main__":
         env.current_time += 1
         print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
 
-        print(f"+++++++++++++++++++------c-------+++++++++++++++++++++++")
         actions = state.generate_actions()
         explore_step = 1
         if env.current_time >= 0 :
@@ -502,6 +523,27 @@ if __name__ == "__main__":
         if appDAG.app_finished_time > 0:
             sum_time += appDAG.app_finished_time - arriving_time
             finished_tasks_num += 1
-    print(f"完成的任务数{finished_tasks_num}")
-    print(f"平均响应时间:{sum_time/finished_tasks_num}")
+
+    if finished_tasks_num == 0:
+        print(f"完成的任务数{finished_tasks_num}")
+        print(f"平均响应时间:-1(没有任务完成)")
+    else:
+        print(f"完成的任务数{finished_tasks_num}")
+        print(f"平均响应时间:{sum_time / finished_tasks_num}")
+    print(f"seed:{seed}")
+
+    # sum_time = 0
+    # finished_tasks_num = 0
+    # for index, app in enumerate(env.tasks):
+    #     appDAG, _, _, arriving_time = app
+    #     print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
+    #           f"响应时间(任务完成时间-任务到达时间)是{appDAG.app_finished_time - arriving_time}")
+    #     if appDAG.app_finished_time > 0:
+    #         sum_time += appDAG.app_finished_time - arriving_time
+    #         finished_tasks_num += 1
+    #     if finished_tasks_num >= 11:
+    #         break
+    # print(f"前23完成的任务{finished_tasks_num}")
+    # print(f"前23个任务完成平均响应时间:{sum_time/finished_tasks_num}")
+
 

@@ -27,12 +27,12 @@ class BrainDQN:
         :param num_node_feat: number of features on the nodes
         :param num_edge_feat: number of features on the edges
         """
-        in_dim = 13
+        in_dim = args.num_node_feats
         hidden_dim = 16
         out_dim = 1
         num_heads = 4
         num_epochs = 1000
-        self.lr = 0.1
+        self.lr = args.learning_rate
 
         self.args = args
 
@@ -106,10 +106,10 @@ class BrainDQN:
 
 
 
-            print("++++++++predict:action_graphs+++++++")
-            print(action_graphs)
-            print("+++++++action_nodeIDs+++++++")
-            print(action_nodeIDs)
+            # print("++++++++predict:action_graphs+++++++")
+            # print(action_graphs)
+            # print("+++++++action_nodeIDs+++++++")
+            # print(action_nodeIDs)
 
             for graph, nodeID in zip(action_graphs, action_nodeIDs):
                 features = graph.ndata['n_feat']

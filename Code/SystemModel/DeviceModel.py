@@ -103,8 +103,8 @@ class Device:
         # 将任务总时间加到设备的可获得时间上
         if best_device is not None:
             best_device.available_time += best_time
-            print(
-                f"Task is offloaded to Device {best_device_index} with updated available time: {best_device.available_time:.2f} seconds")
+            # print(
+            #     f"Task is offloaded to Device {best_device_index} with updated available time: {best_device.available_time:.2f} seconds")
         return best_device.available_time, best_device #用于后面计算任务的响应时间
 
     def offload_local_task(self, task):
