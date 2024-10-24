@@ -12,7 +12,6 @@ class PrioritizedReplayMemory:
     https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/
     https://arxiv.org/abs/1511.05952
     """
-
     e = 0.01
     a = 0.6
     b = 0.4
@@ -43,9 +42,16 @@ class PrioritizedReplayMemory:
         :param error:  the error of the sample
         :param sample: the sample (s, a, r, s)
         """
-
         p = self.get_priority(error)
         self.tree.add(p, sample)
+    def random_add(self, error, sample):
+        """
+        Add a new sample in the memory
+        :param error:  the error of the sample
+        :param sample: the sample (s, a, r, s)
+        """
+        p = self.get_priority(error)
+        self.tree.random_add(p, sample)
 
     def get_importance_sampling_weight(self, p):
         """
@@ -55,6 +61,9 @@ class PrioritizedReplayMemory:
         """
 
         return (p * self.capacity) ** (-self.b)  # equivalent to ((1./self.capacity) * (1./p)) ** self.b
+
+    def size(self):
+        return self.tree.total();
 
     def sample(self, n):
         """

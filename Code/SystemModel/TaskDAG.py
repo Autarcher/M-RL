@@ -64,6 +64,7 @@ class TaskDAG:
 
         # 创建出口任务，数据量和计算量为0
         exit_task = TaskNode(0, 0, 0)
+        exit_task.is_finished_task = 1
         exit_task_id = self.num_nodes + 1
         self.nodes.append((exit_task_id, exit_task))
         self.task_node_finished_flag.append(False)

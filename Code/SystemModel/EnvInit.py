@@ -26,6 +26,9 @@ class RLState:
 
         self._update_tasks() #初始化 pending_tasks和ready_tasks
 
+
+
+
     def _update_tasks(self):
         """
         更新 ready_tasks 和 pending_tasks 列表
@@ -98,6 +101,19 @@ class EnvInit:
         self.t_add_runnings_tasks_num = 0
         self.t_finished_tasks_num = 0
         self.t_finished_apps_num = 0
+
+    def env_clear(self):
+        # self.devices = []
+        self.tasks = []
+        self.running_tasks = []
+        self.current_time = 0
+
+
+        self.t_add_runnings_tasks_num = 0
+        self.t_finished_tasks_num = 0
+        self.t_finished_apps_num = 0
+
+
 
     def clear_t_record(self):
         self.t_add_runnings_tasks_num = 0
@@ -207,11 +223,14 @@ class EnvInit:
             print("Invalid action index.")
 
         return self.running_tasks
-    def get_next_state(self):
+    def get_next_state_and_reward(self, state, action):
         """
         根据动作更新环境的状态
         :param action_index: index of the action in the ready_tasks list
         """
+        self.update_running_tasks(state, action)
+
+
         for running_task in self.running_tasks:
             if running_task[2] <= self.current_time:
                 task_node, _, finished_time, node_id, appID = running_task
@@ -226,7 +245,15 @@ class EnvInit:
 
                 self.running_tasks.remove(running_task)
         state = self.get_state()
-        return state
+
+        #得到奖励
+        if action >= -1:
+            reward = (self.t_finished_apps_num * 10) + (self.t_finished_tasks_num * 1) + (
+                    self.t_add_runnings_tasks_num * 1)
+        else:
+            reward = -1
+
+        return state, reward
 
 
 
@@ -378,7 +405,7 @@ if __name__ == "__main__":
     # state = env.get_next_state()
     # env.update_running_tasks(state, 0)
     # env.update_running_tasks(state, 1)
-    for i in range(800):
+    for i in range(200):
         # 假设这个部分在每秒的循环中执行
         #任务随即到达
         if random.random() < 0.1:  # 10% 的概率
@@ -390,12 +417,14 @@ if __name__ == "__main__":
         if random.random() < 0.1:  # 10% 的概率
             device0.initialize_task_dag('task_type3', args, env)
 
-        state = env.get_next_state() #这个里面会判断app是否已经完成
-        actions = state.generate_actions()
         if actions:
             # random.seed(args.seed)
             random_action = random.randint(0, len(actions) - 1)
             env.update_running_tasks(state, random_action)
+        else:
+            action = -2
+        state, reward = env.get_next_state_and_reward(state, random_action) #这个里面会判断app是否已经完成
+        actions = state.generate_actions()
         # env.update_running_tasks(state, 0)
         for task_tuple in state.app_list:
             app_DAG, app_type, app_device, arriving_time = task_tuple
@@ -430,12 +459,12 @@ if __name__ == "__main__":
         env.current_time += 1
         print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
 
-        print(f"+++++++++++++++++++------奖励测试-------+++++++++++++++++++++++")
+        print(f"+++++++++++++++++++------c-------+++++++++++++++++++++++")
         actions = state.generate_actions()
-        explore_step = 20
-        if env.current_time % explore_step == 0:
-            reward = (env.t_finished_apps_num * 10) + (env.t_finished_tasks_num * 1) + (
-                        env.t_add_runnings_tasks_num * 1)
+        explore_step = 1
+        if env.current_time >= 0 :
+            # reward = (env.t_finished_apps_num * 10) + (env.t_finished_tasks_num * 1) + (
+            #             env.t_add_runnings_tasks_num * 1)
             print(f"第{env.current_time / explore_step}次完成探索时的奖励：{reward} ")
             env.clear_t_record()
     # print("************************执行任务***************************")

@@ -1,6 +1,5 @@
 import numpy
-
-
+import random
 class SumTree:
     """
     Implementation of the Sum Tree data structure
@@ -8,7 +7,6 @@ class SumTree:
     https://github.com/jaromiru/AI-blog/blob/master/SumTree.py
     """
     write = 0
-
     def __init__(self, capacity):
         self.capacity = capacity
         self.tree = numpy.zeros(2 * capacity - 1)
@@ -47,6 +45,17 @@ class SumTree:
         if self.write >= self.capacity:
             self.write = 0
 
+
+    def random_add(self, p, data):
+        random_idx = random.randint(0, self.capacity - 1)
+
+        self.data[random_idx] = data
+
+        # 计算在树中的索引
+        tree_idx = random_idx + self.capacity - 1
+
+        self.update(tree_idx, p)
+
     def update(self, idx, p):
         change = p - self.tree[idx]
 
@@ -58,3 +67,6 @@ class SumTree:
         data_idx = idx - self.capacity + 1
 
         return idx, self.tree[idx], self.data[data_idx]
+
+    def count(self):
+        return self.write if self.write < self.capacity else self.capacity

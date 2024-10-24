@@ -1,14 +1,19 @@
-from Code.SystemModel.TaskModel import TaskNode
-from Code.SystemModel.TaskDAG import TaskDAG
-from Code.SystemModel.DeviceModel import Device
-from Code.SystemModel.EnvInit import  RLState,EnvInit
+from Code.SystemModel.EnvInit import EnvInit
 from Code.TaskSchedulingModel.BrainDQN import BrainDQN
 from Code.TaskSchedulingModel.util.prioritized_replay_memory import  PrioritizedReplayMemory
-import numpy as np
+import torch
 import argparse
+import random
+
+import numpy as np
+
+import dgl
+
+
+
 
 #  definition of constants
-MEMORY_CAPACITY = 50
+MEMORY_CAPACITY = 1000
 GAMMA = 1
 STEP_EPSILON = 5000.0
 UPDATE_TARGET_FREQUENCY = 500
@@ -18,21 +23,30 @@ MAX_BETA = 10
 MIN_VAL = -1000000
 MAX_VAL = 1000000
 
+# 定义设备
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class Trainer:
     def __init__(self, args):
         """
         Initialization of the trainer
         :param args:  argparse object taking hyperparameters and instance  configuration
         """
-
+        self.n_step = args.n_step
+        self.steps_done = 0
         self.args = args
+        self.app_type_dict ={
+            'task_type1': 1,
+            'task_type2': 2,
+            'task_type3': 3
+        }
         np.random.seed(self.args.seed)
         # self.n_action = args.n_task * args.n_device * (args.n_device + args.n_h_max)
 
         self.num_node_feats = args.num_node_feats
         self.reward_scaling = 0.001
 
-        self.brain = BrainDQN(self.args, self.num_node_feats)
+        self.brain = BrainDQN(self.args, self.num_node_feats, self.num_node_feats)
         self.memory = PrioritizedReplayMemory(MEMORY_CAPACITY)
 
 
@@ -41,80 +55,377 @@ class Trainer:
         print("[INFO] n_node_feat: %d" % self.num_node_feats)
         print("***********************************************************")
 
-    def run_training(self, env, state):
+    def run_training(self, env):
         """
         Run de main loop for training the model
         """
         #  Generate a random instance
-        if self.args.plot_training:
-            iter_list = []
-            reward_list = []
+        state = env.get_state()
+        actions = state.generate_actions()
+        state.print_actions(actions)
 
-        self.initialize_memory(env)
-        print('[INFO]', 'iter', 'time', 'avg_reward_learning', 'loss', "beta")
+        self.initialize_memory(self.env)
 
-        cur_best_reward = MIN_VAL
 
-        for i in range(self.args.n_episode):
 
-            loss, beta = self.run_episode(i, False, env)
+        print("------------------------------测试get_next_state函数--------------------------------------")
+        # env.update_running_tasks(state, 0)
+        # state = env.get_next_state()
+        # env.update_running_tasks(state, 0)
+        # env.update_running_tasks(state, 1)
+        for i in range(200):
+            # 假设这个部分在每秒的循环中执行
+            # 任务随即到达
+            if random.random() < 0.1:  # 10% 的概率
+                device0.initialize_task_dag('task_type1', args, env)
 
-            #  We first evaluate the validation step every 10 episodes, until 100, then every 100 episodes.
-            if (i % 10 == 0 and i < 101) or i % 100 == 0:
+            if random.random() < 0.1:  # 10% 的概率
+                device0.initialize_task_dag('task_type2', args, env)
 
-                avg_reward = 0.0
-                for j in range(self.validation_len):
-                    avg_reward += self.evaluate_instance(j, env)
+            if random.random() < 0.1:  # 10% 的概率
+                device0.initialize_task_dag('task_type3', args, env)
 
-                avg_reward = avg_reward / self.validation_len
+            loss, beta, eps_reward, eps_job = self.run_episode(i, False, env)
 
-                cur_time = round(time.time() - start_time, 2)
 
-                print('[DATA]', i, cur_time, avg_reward, loss, beta)
+            if actions:
+                # random.seed(args.seed)
+                random_action = random.randint(0, len(actions) - 1)
+                env.update_running_tasks(state, random_action)
+            else:
+                action = -2
+            state, reward = env.get_next_state_and_reward(state, random_action)  # 这个里面会判断app是否已经完成
+            actions = state.generate_actions()
+            # env.update_running_tasks(state, 0)
+            for task_tuple in state.app_list:
+                app_DAG, app_type, app_device, arriving_time = task_tuple
+                print("*************************+++++++++其中一个任务++++++++**************************")
+                print("app种类" + str(app_type))
+                print("所属设备" + str(app_device))
+                print("到达时间" + str(arriving_time))
+                app_DAG.print_adjacency_list()
+                print("scheduled flag:")
+                print(app_DAG.task_node_scheduled_flag)
+                print("finished flag:")
+                print(app_DAG.task_node_finished_flag)
+                print("finished time:")
+                print(app_DAG.task_node_finished_time)
+                print("scheduled seq:")
+                print(app_DAG.task_node_scheduled_seq)
+                print("app finished time")
+                print(app_DAG.app_finished_time)
 
-                sys.stdout.flush()
+            print("***************************************************")
+            for task in state.ready_tasks:
+                task_node, app_device, arriving_time, node_id, appID = task
+                print("所属设备" + str(app_device))
+                print("到达时间" + str(arriving_time))
+                print("任务ID:" + str(node_id))
+                print("所属AppID:" + str(appID))
+                task_node.print_task_info()
+                print("***************************************************")
+                actions = state.generate_actions()
+                state.print_actions(actions)
+            env.current_time += 1
+            print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
 
-                if self.args.plot_training:
-                    iter_list.append(i)
-                    reward_list.append(avg_reward)
-                    plt.clf()
+            print(f"+++++++++++++++++++------c-------+++++++++++++++++++++++")
+            actions = state.generate_actions()
+            explore_step = 1
+            if env.current_time >= 0:
+                # reward = (env.t_finished_apps_num * 10) + (env.t_finished_tasks_num * 1) + (
+                #             env.t_add_runnings_tasks_num * 1)
+                print(f"第{env.current_time / explore_step}次完成探索时的奖励：{reward} ")
+                env.clear_t_record()
+        # print("************************执行任务***************************")
+        # state = env.get_next_state(state, 0)
+        # for task in state.ready_tasks:
+        #     task_node, app_device, arriving_time, node_id, appID = task
+        #     print("所属设备"+str(app_device))
+        #     print("到达时间"+str(arriving_time))
+        #     print("任务ID:" + str(node_id))
+        #     print("所属AppID:" + str(appID))
+        #     task_node.print_task_info()
+        # print("***************************************************")
+        #
+        # for task_tuple in state.app_list:
+        #     app_DAG, app_type, app_device, arriving_time = task_tuple
+        #     print("***************************************************")
+        #     print("app种类" + str(app_type))
+        #     print("所属设备"+str(app_device))
+        #     print("到达时间"+str(arriving_time))
+        #     app_DAG.print_adjacency_list()
+        #     print(app_DAG.task_node_finished_flag)
+        #     print(app_DAG.task_node_finished_time)
+        # actions = state.generate_actions()
+        # state.print_actions(actions)
+        # Exploration setp
+        print("*******************************测试get_next_state函数完毕*******************************")
 
-                    plt.plot(iter_list, reward_list, linestyle="-", label="DQN", color='y')
+        sum_time = 0
+        finished_tasks_num = 0
+        for index, app in enumerate(env.tasks):
+            appDAG, _, _, arriving_time = app
+            print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
+                  f"响应时间(任务完成时间-任务到达时间)是{appDAG.app_finished_time - arriving_time}")
+            if appDAG.app_finished_time > 0:
+                sum_time += appDAG.app_finished_time - arriving_time
+                finished_tasks_num += 1
+        print(f"完成的任务数{finished_tasks_num}")
+        print(f"平均响应时间:{sum_time / finished_tasks_num}")
+        return 0
 
-                    plt.legend(loc=3)
-                    out_fig_file = '%s/training_curve_reward.png' % self.args.save_dir
-                    out_csv_file = '%s/training_data.csv' % self.args.save_dir
-                    if not os.path.exists(self.args.save_dir):
-                        os.makedirs(self.args.save_dir)
-                    plt.savefig(out_fig_file)
 
-                    # save the data
-                    with open(out_csv_file, mode='w', newline='') as file:
-                        writer = csv.writer(file)
-                        # 写入标题
-                        writer.writerow(['Iteration', 'Reward'])
-                        # 写入数据
-                        for i, reward in zip(iter_list, reward_list):
-                            writer.writerow([i, reward])
 
-                fn = "iter_%d_model.pth.tar" % i
 
-                #  We record only the model that is better on the validation set wrt. the previous model
-                #  We nevertheless record a model every 10000 episodes
-                if avg_reward >= cur_best_reward:
-                    cur_best_reward = avg_reward
-                    self.brain.save(folder=self.args.save_dir, filename=fn)
-                elif i % 10000 == 0:
-                    self.brain.save(folder=self.args.save_dir, filename=fn)
+    def get_state_feature(self, state):
+        action_graphs = []
+        action_nodeIDs = []
+
+        actions = state.generate_actions()
+        for index, action in enumerate(actions):
+            task = env.tasks[action.get("appID")]
+            action_nodeIDs.append(action.get("node_id"))
+            # print(f"----------第{index}个ready------------")
+            task_features, adj_matrix = trainer.aggregate_appDAG_task_features(state, env, task)
+            # state, reward = env.get_next_state_and_reward(state, task.task_id)  # 使用 task_id 获取状态和奖励
+            graph = trainer.make_nn_input(task_features, adj_matrix)
+            action_graphs.append(graph)
+
+
+            # trainer.print_task_features(task_features, adj_matrix)
+
+
+            print(graph)
+        return (action_graphs, action_nodeIDs)
+
+
+    def run_episode(self, episode_idx, memory_initialization, env):
+        state = env.get_state()
+        action_graphs = []
+        action_nodeIDs = []
+        actions = state.generate_actions()
+        for index, action in enumerate(actions):
+            task = env.tasks[action.get("appID")]
+            action_nodeIDs.append(action.get("node_id"))
+            print(f"----------第{index}个ready------------")
+            task_features, adj_matrix = trainer.aggregate_appDAG_task_features(state, env, task)
+            # state, reward = env.get_next_state_and_reward(state, task.task_id)  # 使用 task_id 获取状态和奖励
+            graph = trainer.make_nn_input(task_features, adj_matrix)
+            action_graphs.append(graph)
+            trainer.print_task_features(task_features, adj_matrix)
+            print(graph)
+
+        #得到action
+        predictions = self.brain.model.predict(action_graphs, action_nodeIDs)
+        select_action_index = predictions.index(max(predictions))
+        action = select_action_index
+
+        state_features = (action_graphs, action_nodeIDs)
+
+        next_state, reward = env.get_next_state_and_reward(state, action)
+
+
+
+        next_state_features = self.get_state_feature(next_state)
+        print("++++++++++++++++next_state_features++++++++++++")
+        print(next_state_features)
+
+
+        sample = (state_features, action, reward, next_state_features)
+
+
+        x, y, errors = self.get_targets([(0, sample, 0)])
+        loss = errors
+
+        print("loss:", loss)
+        self.memory.random_add(loss, sample)
+        return loss, reward
+
+
+    def get_targets(self, batch):
+        """
+        Compute the TD-errors using the n-step Q-learning function and the model prediction
+        :param batch: the batch to process
+        :return: the state input, the true y, and the error for updating the memory replay
+        """
+        #这里的batch要改，因为我的每一个batch里的当sample有多个Graph
+        batch_len = len(batch)
+        print("+++++++batch+++++++")
+        print(batch[0][1][1])
+
+        graphs_list, nodeIDs_list = list(zip(*[e[1][0] for e in batch]))
+        # graphs_list = [g for graph in graphs_list for g in (graph if isinstance(graph, list) else [graph])]
+
+        print("+++++++++graphs_list[0]++++++++")
+        print(graphs_list)
+        print("+++++++++nodeIDs_list[0]++++++++")
+        print(nodeIDs_list)
+
+        # graphs_batch = dgl.batch(graphs_list)
+
+        next_graphs_list, next_nodeIDs_list = list(zip(*[e[1][3] for e in batch]))
+        # next_graphs_list = [g for graph in next_graphs_list for g in (graph if isinstance(graph, list) else [graph])]
+
+
+        p = self.brain.predict(graphs_list[0], nodeIDs_list[0], target=False)
+
+
+        #改为判断下一个状态的read_task数是0也就是没有任务
+
+        p_ = self.brain.predict(next_graphs_list[0], next_nodeIDs_list[0], target=False)
+        p_target_ = self.brain.predict(next_graphs_list[0], next_nodeIDs_list[0], target=True)
+            # print("p_", p_)
+            # print("p_target_", p_target_)
+
+
+        x = []
+        y = []
+        errors = np.zeros(len(batch))
+
+        for i in range(batch_len):
+
+            sample = batch[i][1]
+            state_graphs, state_nodeIDs = sample[0]
+            action = sample[1]
+            reward = sample[2]
+            next_state_graphs, next_state_nodeIDs = sample[3]
+
+            q_value_prediction = p[action]
+
+            #nextactions
+            if len(next_state_nodeIDs) == 0:
+                td_q_value = reward
+                t[action] = td_q_value
+
+            else:
+                # predictions = self.brain.model.predict(next_state_graphs, next_state_nodeIDs)
+                # select_action_index = predictions.index(max(predictions))
+                best_valid_next_action_id = p_.index(max(p_))
+                td_q_value = reward + GAMMA * p_target_[best_valid_next_action_id]
+                t = td_q_value
+
+            state = (state_graphs, state_nodeIDs)
+            x.append(state)
+            y.append(t)
+
+            errors[i] = abs(q_value_prediction - td_q_value)
+
+        return x[0], y[0], errors[0]
+
+    def learning(self):
+        """
+        execute a learning step on a batch of randomly selected experiences from the memory
+        :return: the subsequent loss
+        """
+
+        batch = self.memory.sample(self.args.batch_size)
+
+        x, y, errors = self.get_targets(batch)
+
+        self.memory.update(batch[0][0],errors)
+        #  update the errors
+        # for i in range(len(batch)):
+        #     idx = batch[i][0]
+        #     self.memory.update(idx, errors[i])
+
+        loss = self.brain.train(x, y)
+
+        # print("--- learn_loss:", loss, "---")
+        return round(loss, 4)
+
+    def run_training(self, env, state):
+        return
 
     def initialize_memory(self, env):
         """
         Initialize the replay memory with random episodes and a random selection
         """
+        device0 = env.devices[0][0]
+        device0.initialize_task_dag('task_type1', args, env)
+        device0.initialize_task_dag('task_type2', args, env)
+        device0.initialize_task_dag('task_type3', args, env)
+        device0.initialize_task_dag('task_type3', args, env)
+        for i in range(MEMORY_CAPACITY):
+            # 假设这个部分在每秒的循环中执行
+            # 任务随即到达
+            # device0.initialize_task_dag('task_type1', args, env)
+            if random.random() < 0.1:  # 10% 的概率
+                device0.initialize_task_dag('task_type1', args, env)
 
-        while self.init_memory_counter < MEMORY_CAPACITY:
-            self.run_episode(0, True, env)
+            if random.random() < 0.1:  # 10% 的概率
+                device0.initialize_task_dag('task_type2', args, env)
 
+            if random.random() < 0.1:  # 10% 的概率
+                device0.initialize_task_dag('task_type3', args, env)
+
+            # 得到action
+            state = env.get_state()
+            state_features = self.get_state_feature(state)
+            actions = state.generate_actions()
+
+            if actions:
+                # random.seed(args.seed)
+                random_action = random.randint(0, len(actions) - 1)
+                action = random_action
+            else:
+                action = -2
+
+
+            next_state, reward = env.get_next_state_and_reward(state, random_action)  # 这个里面会判断app是否已经完成
+            next_state_features = self.get_state_feature(state)
+
+            # print("++++++++++++++++next_state_features++++++++++++")
+            # print(next_state_features)
+
+            sample = (state_features, action, reward, next_state_features)
+
+
+            error = abs(reward)
+            self.memory.random_add(error, sample)
+            env.current_time += 1
+            print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
+
+
+        MAX_TIME = 1000
+        running_time = 0
+        while(len(env.running_tasks) > 0) or running_time >= MAX_TIME:
+            print(f"++++++++++current_time:{env.current_time}, current_running_tasks:{len(env.running_tasks)}++++++++++++")
+            running_time += 1
+            env.current_time += 1
+            for running_task in env.running_tasks:
+                if running_task[2] <= env.current_time:
+                    task_node, _, finished_time, node_id, appID = running_task
+                    env.tasks[appID][0].task_node_finished_flag[node_id] = True
+                    env.tasks[appID][0].task_node_finished_time[node_id] = finished_time
+                    env.t_finished_tasks_num += 1
+
+                    # 如果时出口任务那么记录这个任务的结束时间
+                    if node_id == len(env.tasks[appID][0].nodes) - 1:
+                        env.tasks[appID][0].app_finished_time = finished_time
+                        env.t_finished_apps_num += 1
+
+                    env.running_tasks.remove(running_task)
+
+
+        sum_time = 0
+        finished_tasks_num = 0
+        for index, app in enumerate(env.tasks):
+            appDAG, _, _, arriving_time = app
+            if(index%10 == 0):
+                print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
+                    f"响应时间(任务完成时间-任务到达时间)是{appDAG.app_finished_time - arriving_time}")
+            if appDAG.app_finished_time > 0:
+                sum_time += appDAG.app_finished_time - arriving_time
+                finished_tasks_num += 1
+
+        print(f"完成的任务数{finished_tasks_num}")
+        if(finished_tasks_num == 0):
+            print(f"平均响应时间: -1(无任务完成)")
+        else:
+            print(f"平均响应时间:{sum_time / finished_tasks_num}")
+
+        env.env_clear()
         print("[INFO] Memory Initialized")
 
 
@@ -131,11 +442,13 @@ class Trainer:
         task_features = self.aggregate_task_features(state)
 
     def aggregate_appDAG_task_features(self, state, env, app):
+        #得到节点特征
         app_DAG, app_type, app_device, arriving_time = app
         task_features = []
-        for node_id in range(app_DAG.num_nodes):
+        for node_id in range(app_DAG.num_nodes+2):
             task_node = app_DAG.nodes[node_id][1]
             task_device = env.devices[app_device][0]
+            # task_ready_time = env.running_tasks[]
             arr = [
                 task_node.data_size,
                 task_node.computation_size,
@@ -144,17 +457,58 @@ class Trainer:
                 app_DAG.out_degree[node_id],
                 arriving_time,
                 node_id,
-                app_type,
+                self.app_type_dict[app_type],
                 task_device.coordinates[0],
                 task_device.coordinates[1],
                 task_device.computing_speed,
                 task_device.channel_gain,
                 task_device.available_time,
+                # task_ready_time
             ]
             task_features.append(arr)
-        return task_features
+        #得到邻接矩阵
+        adjacency_list = app_DAG.adjacency_list
+        num_nodes = len(adjacency_list)
+        adj_matrix = np.zeros((num_nodes, num_nodes), dtype=int)
+        for node, dependencies in adjacency_list.items():
+            for dep in dependencies:
+                adj_matrix[node][dep] = 1  # node 指向 dep
+                adj_matrix[dep][node] = 1  # dep 也指向 node（无向）
 
-    def print_task_features(self, task_features):
+        return task_features, adj_matrix
+
+    def make_nn_input(self, task_features, adj_matrix):
+        # 将任务特征从列表转换为 NumPy 的 ndarray
+        if isinstance(task_features, list):
+            task_features = np.array(task_features, dtype=np.float32)
+
+        # 将 NumPy 矩阵转换为 PyTorch 的张量
+        if isinstance(task_features, np.ndarray):
+            task_features = torch.tensor(task_features, dtype=torch.float)
+
+        if isinstance(adj_matrix, np.ndarray):
+            adj_matrix = torch.tensor(adj_matrix, dtype=torch.float)
+
+        # 创建 DGL 图对象，使用邻接矩阵
+        edges = adj_matrix.nonzero(as_tuple=True)
+        g = dgl.graph(edges)
+
+        # 确保节点特征数量与图中的节点数一致
+        if task_features.shape[0] != g.num_nodes():
+            raise ValueError(f"节点特征数量 ({task_features.shape[0]}) 与图中的节点数量 ({g.num_nodes()}) 不匹配")
+
+        # 将任务特征分配给节点
+        g.ndata['n_feat'] = task_features
+
+        # 创建边特征，与节点特征维度一致，并用1填充
+        edge_features = torch.ones((g.num_edges(), task_features.shape[1]), dtype=torch.float)
+
+        # 将边特征分配给边
+        g.edata['e_feat'] = edge_features
+
+        return g
+
+    def print_task_features(self, task_features, adj_matrix):
         """
         Print the task features.
 
@@ -163,9 +517,11 @@ class Trainer:
         """
         print("Task Features:")
         for index, features in enumerate(task_features):
-            print(f"Task {index + 1}: {features}")
+            print(f"Task {index}: {features}")
 
         print(f"Task features shape: (1,{len(task_features[0])})")
+        print("邻接矩阵:\n")
+        print(adj_matrix)
 
 
 def parse_arguments():
@@ -227,7 +583,7 @@ def parse_arguments():
     parser.add_argument('--n_episode', type=int, default=10000)
     parser.add_argument('--save_dir', type=str, default='./result-default')
     parser.add_argument('--plot_training', type=int, default=1)
-    parser.add_argument('--mode', default='gpu', help='cpu/gpu')
+    parser.add_argument('--mode', default='cpu', help='cpu/gpu')
 
     return parser.parse_args()
 
@@ -250,6 +606,9 @@ if __name__ == "__main__":
     # device0发出三个任务请求初始化三个任务DAG每类DAG各一种
     device0 = env.devices[0][0]
     device0.initialize_task_dag('task_type1', args, env)
+    device0.initialize_task_dag('task_type2', args, env)
+    device0.initialize_task_dag('task_type3', args, env)
+    device0.initialize_task_dag('task_type3', args, env)
 
 
 
@@ -258,7 +617,7 @@ if __name__ == "__main__":
     actions = state.generate_actions()
     state.print_actions(actions)
     env.update_running_tasks(state, 0)
-    state = env.get_next_state()
+    state, reward = env.get_next_state_and_reward(state, -2)
     actions = state.generate_actions()
     for task_tuple in state.app_list:
         app_DAG, app_type, app_device, arriving_time = task_tuple
@@ -291,8 +650,18 @@ if __name__ == "__main__":
         state.print_actions(actions)
 
 
-    task_features = trainer.aggregate_appDAG_task_features(state, env, env.tasks[0])
+    task_features, adj_matrix = trainer.aggregate_appDAG_task_features(state, env, env.tasks[0])
 
-    trainer.print_task_features(task_features)
-
+    state, reward = env.get_next_state_and_reward(state, 0)  # 这个里面会判断app是否已经完成
+    graph = trainer.make_nn_input(task_features, adj_matrix)
+    trainer.print_task_features(task_features, adj_matrix)
+    # print("tensor_data:")
+    print(graph)
+    print("++++++++++++++run_episode++++++++++++++++++")
+    print(trainer.run_episode(1, False, env))
+    # loss, _ = trainer.run_episode_test(1, True, env)
+    # print(f"test_Loss:{loss}")
     print("*******************************测试aggregate_appDAG_task_features函数完毕*******************************")
+    print("*******************************测试init_memory函数*******************************")
+    env.env_clear()
+    trainer.initialize_memory(env)
