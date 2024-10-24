@@ -13,7 +13,7 @@ import dgl
 
 
 #  definition of constants
-MEMORY_CAPACITY = 100
+MEMORY_CAPACITY = 200
 GAMMA = 1
 STEP_EPSILON = 5000.0
 UPDATE_TARGET_FREQUENCY = 500
@@ -81,11 +81,11 @@ class Trainer:
         # state = env.get_next_state()
         # env.update_running_tasks(state, 0)
         # env.update_running_tasks(state, 1)
-        for i in range(50):
+        for i in range(100):
             print(f"---------------第{i}轮的强化学习开始----------------")
             # 假设这个部分在每秒的循环中执行
             # 任务随即到达
-            seed = 3
+            seed = 4
             random.seed(seed)
             random1 = random.random()
             random2 = random.random()
