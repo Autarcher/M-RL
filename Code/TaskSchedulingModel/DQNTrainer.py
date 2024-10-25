@@ -13,15 +13,26 @@ import dgl
 
 
 #  definition of constants
-MEMORY_CAPACITY = 200
+MEMORY_CAPACITY = 400
 GAMMA = 1
 STEP_EPSILON = 5000.0
-UPDATE_TARGET_FREQUENCY = 500
 VALIDATION_SET_SIZE = 100
 RANDOM_TRIAL = 100
 MAX_BETA = 10
 MIN_VAL = -1000000
 MAX_VAL = 1000000
+
+
+#测试训练轮次的参数
+UPDATE_TARGET_FREQUENCY = 20 #每学习多少次模型传递依次参数
+
+EPISODE = 10
+
+SYSTEM_MAX_TIMES = 200
+
+LEARNING_STEPS = 5
+
+
 
 # 定义设备
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -60,16 +71,6 @@ class Trainer:
         Run de main loop for training the model
         """
         #  Generate a random instance
-        device0 = env.devices[0][0]
-        device0.initialize_task_dag('task_type1', args, env)
-        device0.initialize_task_dag('task_type2', args, env)
-        device0.initialize_task_dag('task_type3', args, env)
-        device0.initialize_task_dag('task_type1', args, env)
-        device0.initialize_task_dag('task_type2', args, env)
-        device0.initialize_task_dag('task_type3', args, env)
-
-        state = env.get_state()
-        actions = state.generate_actions()
         # state.print_actions(actions)
 
         self.initialize_memory(env)
@@ -81,60 +82,95 @@ class Trainer:
         # state = env.get_next_state()
         # env.update_running_tasks(state, 0)
         # env.update_running_tasks(state, 1)
-        for i in range(100):
-            print(f"---------------第{i}轮的强化学习开始----------------")
+        for i in range(EPISODE):
+            print(f"++++++++++++++++++++++-------------第{i+1}次(系统共运行{SYSTEM_MAX_TIMES}时间)训练开始-------------++++++++++++++++++")
+
+            total_reward = self.training_round(env)
+
+
+            sum_time = 0
+            finished_tasks_num = 0
+            for index, app in enumerate(env.tasks):
+                appDAG, _, _, arriving_time = app
+                print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
+                    f"响应时间(任务完成时间-任务到达时间)是{appDAG.app_finished_time - arriving_time}")
+                if appDAG.app_finished_time > 0:
+                    sum_time += appDAG.app_finished_time - arriving_time
+                    finished_tasks_num += 1
+            print(f"++++++++++++++++++++++++++++++++第{i}次(系统共运行{SYSTEM_MAX_TIMES}时间)训练结果++++++++++++++++++++++++++++")
+            if finished_tasks_num == 0:
+                print(f"完成的任务数{finished_tasks_num}")
+                print(f"平均响应时间:-1(没有任务完成)")
+                print(f"总奖励为:{total_reward}")
+            else:
+                print(f"完成的任务数{finished_tasks_num}")
+                print(f"平均响应时间:{sum_time / finished_tasks_num}")
+                print(f"总奖励为:{total_reward}")
+
+
+            env.env_clear()
+            print(f"++++++++++++++++-------------第{i+1}次(系统共运行{SYSTEM_MAX_TIMES}时间)训练结束-------------++++++++++++++++++")
+
+
+        return 0
+
+
+    def training_round(self, env):
+        device0 = env.devices[0][0]
+        device0.initialize_task_dag('task_type1', args, env)
+        device0.initialize_task_dag('task_type2', args, env)
+        device0.initialize_task_dag('task_type3', args, env)
+        device0.initialize_task_dag('task_type1', args, env)
+        device0.initialize_task_dag('task_type2', args, env)
+        device0.initialize_task_dag('task_type3', args, env)
+
+        state = env.get_state()
+        actions = state.generate_actions()
+
+        total_reward = 0
+        for i in range(SYSTEM_MAX_TIMES):
+            print(f"---------------第{i+1}轮的强化学习开始----------------")
             # 假设这个部分在每秒的循环中执行
+
             # 任务随即到达
             seed = 4
             random.seed(seed)
             random1 = random.random()
             random2 = random.random()
             random3 = random.random()
+            actions = state.generate_actions()
+            actions_len = len(actions)
             count = 0
-            if random1 < 0.33:  # 10% 的概率
-                device0.initialize_task_dag('task_type1', args, env)
-                count = count + 1
+            if(actions_len <= 30):
+                if random1 < 0.33:  # 10% 的概率
+                    device0.initialize_task_dag('task_type1', args, env)
+                    count = count + 1
 
-            if random2 < 0.33:  # 10% 的概率
-                device0.initialize_task_dag('task_type2', args, env)
-                count = count + 1
+                if random2 < 0.33:  # 10% 的概率
+                    device0.initialize_task_dag('task_type2', args, env)
+                    count = count + 1
 
-            if random3 < 0.33:  # 10% 的概率
-                device0.initialize_task_dag('task_type3', args, env)
-                count = count + 1
-            if count < 1:
-                device0.initialize_task_dag('task_type1', args, env)
-            # print(f"+++到达任务数+++{count}")
-            count = 0
+                if random3 < 0.33:  # 10% 的概率
+                    device0.initialize_task_dag('task_type3', args, env)
+                    count = count + 1
+                if count < 1:
+                    device0.initialize_task_dag('task_type1', args, env)
+                # print(f"+++到达任务数+++{count}")
+                count = 0
 
 
             env.current_time += 1
             state = env.get_state()
             actions = state.generate_actions()
 
+            print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
             loss, reward = self.run_episode(i, False, env)
-            print(f"第{i}轮的强化学习loss:{loss}\n")
+            total_reward = total_reward + reward
+            if i % (UPDATE_TARGET_FREQUENCY/LEARNING_STEPS) == 0:
+                self.brain.update_target_model()
 
-
-        sum_time = 0
-        finished_tasks_num = 0
-        for index, app in enumerate(env.tasks):
-            appDAG, _, _, arriving_time = app
-            print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
-                  f"响应时间(任务完成时间-任务到达时间)是{appDAG.app_finished_time - arriving_time}")
-            if appDAG.app_finished_time > 0:
-                sum_time += appDAG.app_finished_time - arriving_time
-                finished_tasks_num += 1
-        if finished_tasks_num == 0:
-            print(f"完成的任务数{finished_tasks_num}")
-            print(f"平均响应时间:-1(没有任务完成)")
-        else:
-            print(f"完成的任务数{finished_tasks_num}")
-            print(f"平均响应时间:{sum_time / finished_tasks_num}")
-        return 0
-
-    import numpy as np
-
+            print(f"第{i+1}轮的强化学习loss:{loss}\n")
+        return total_reward
     def select_action(self, action_graphs, action_nodeIDs, target=True):
         # 预测动作值
         predictions = self.brain.predict(action_graphs, action_nodeIDs, target)
@@ -148,12 +184,12 @@ class Trainer:
         # 计算 softmax，将 predictions 转化为概率分布
         max_value = np.max(predictions)
         stabilized_predictions = predictions - max_value
-        print("+++++++stabilized_predictions+++++++")
-        print(stabilized_predictions)
+        # print("+++++++stabilized_predictions+++++++")
+        # print(stabilized_predictions)
         softmax_probs = np.exp(stabilized_predictions) / np.sum(np.exp(stabilized_predictions))
 
-        print("+++++++softmax_probs+++++++")
-        print(softmax_probs)
+        # print("+++++++softmax_probs+++++++")
+        # print(softmax_probs)
         # 根据 softmax 概率选择动作
         action = np.random.choice(len(predictions), p=softmax_probs)
 
@@ -202,9 +238,9 @@ class Trainer:
             # print(graph)
 
         #得到action
-        print("+++++++select_action++++++++")
+        # print("+++++++select_action++++++++")
         # print(action_graphs)
-        print(action_nodeIDs)
+        # print(action_nodeIDs)
         action = self.select_action(action_graphs, action_nodeIDs)
         print(f"选择的任务{action}")
         state_features = (action_graphs, action_nodeIDs)
@@ -224,10 +260,11 @@ class Trainer:
         x, y, errors = self.get_targets([(0, sample, 0)])
 
         #可以学习多次
-        loss = self.learning()
+        for i in range(LEARNING_STEPS):
+            loss = self.learning()
+            print(f"第{episode_idx+1}轮的第{i+1}次学习的loss:{loss}")
 
 
-        print("loss:", loss)
         self.memory.random_add(errors, sample)
         return loss, reward
 
@@ -319,7 +356,6 @@ class Trainer:
         # for i in range(len(batch)):
         #     idx = batch[i][0]
         #     self.memory.update(idx, errors[i])
-
         loss = self.brain.train(x, y)
 
         # print("--- learn_loss:", loss, "---")
@@ -602,7 +638,7 @@ def parse_arguments():
     parser.add_argument('--n_episode', type=int, default=10000)
     parser.add_argument('--save_dir', type=str, default='./result-default')
     parser.add_argument('--plot_training', type=int, default=1)
-    parser.add_argument('--mode', default='cpu', help='cpu/gpu')
+    parser.add_argument('--mode', default='gpu', help='cpu/gpu')
 
     return parser.parse_args()
 

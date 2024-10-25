@@ -14,6 +14,8 @@ import dgl
 
 from Code.TaskSchedulingModel.GATNetwork import GATModel
 
+# 定义设备
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class BrainDQN:
     """
@@ -37,8 +39,8 @@ class BrainDQN:
         self.args = args
 
 
-        self.model = GATModel(in_dim, hidden_dim, out_dim, num_heads)
-        self.target_model = GATModel(in_dim, hidden_dim, out_dim, num_heads)
+        self.model = GATModel(in_dim, hidden_dim, out_dim, num_heads).to(device)
+        self.target_model = GATModel(in_dim, hidden_dim, out_dim, num_heads).to(device)
 
 
         if self.args.mode == 'gpu':
@@ -64,7 +66,8 @@ class BrainDQN:
 
         # Forward pass for each graph
         for i, graph in enumerate(action_graphs):
-            features = graph.ndata['n_feat']
+            features = graph.ndata['n_feat'].to(device)
+            graph = graph.to(device)
             output = self.model(graph, features)
 
             # Extract the value corresponding to action_nodeID[i]
@@ -77,7 +80,10 @@ class BrainDQN:
                 max_nodeID = action_nodeIDs[i]
 
         # Calculate loss (mean squared error between max value and reward)
-        loss = F.mse_loss(max_value, torch.tensor([y], dtype=torch.float))
+        # print("++++++++device++++++")
+        # print(device)
+        max_value = max_value.to(device)
+        loss = F.mse_loss(max_value, torch.tensor([y], dtype=torch.float).to(device))
 
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -113,6 +119,8 @@ class BrainDQN:
 
             for graph, nodeID in zip(action_graphs, action_nodeIDs):
                 features = graph.ndata['n_feat']
+                graph = graph.to(device)
+                features = features.to(device)
                 output = model(graph, features)
                 predictions.append(output[nodeID].item())
 

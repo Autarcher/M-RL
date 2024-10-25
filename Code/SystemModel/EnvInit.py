@@ -109,7 +109,9 @@ class EnvInit:
         self.tasks = []
         self.running_tasks = []
         self.current_time = 0
-
+        for device in self.devices:
+            device = device[0]
+            device.available_time = 0
 
         self.t_add_runnings_tasks_num = 0
         self.t_finished_tasks_num = 0
@@ -251,8 +253,8 @@ class EnvInit:
 
         #得到奖励
         if action >= -1:
-            reward = (self.t_finished_apps_num * 10) + (self.t_finished_tasks_num * 1) + (
-                    self.t_add_runnings_tasks_num * 1)
+            reward = (self.t_finished_apps_num * 100) + (self.t_finished_tasks_num * 2.5) + (
+                    self.t_add_runnings_tasks_num * -6)
         else:
             reward = -1
 
@@ -409,31 +411,35 @@ if __name__ == "__main__":
     # env.update_running_tasks(state, 0)
     # env.update_running_tasks(state, 1)
     seed = 4
-    for i in range(50):
+    for i in range(200):
         # 假设这个部分在每秒的循环中执行
         # 系统是忙的
         # device0.initialize_task_dag('task_type3', args, env)
         #任务随即到达
+        seed = 4
         random.seed(seed)
         random1 = random.random()
         random2 = random.random()
         random3 = random.random()
+        actions = state.generate_actions()
+        actions_len = len(actions)
         count = 0
-        if random1 < 0.33:  # 10% 的概率
-            device0.initialize_task_dag('task_type1', args, env)
-            count = count + 1
+        if (actions_len <= 30):
+            if random1 < 0.33:  # 10% 的概率
+                device0.initialize_task_dag('task_type1', args, env)
+                count = count + 1
 
-        if random2 < 0.33:  # 10% 的概率
-            device0.initialize_task_dag('task_type2', args, env)
-            count = count + 1
+            if random2 < 0.33:  # 10% 的概率
+                device0.initialize_task_dag('task_type2', args, env)
+                count = count + 1
 
-        if random3 < 0.33:  # 10% 的概率
-            device0.initialize_task_dag('task_type3', args, env)
-            count = count + 1
-        if count < 1:
-            device0.initialize_task_dag('task_type1', args, env)
-        print(f"+++到达任务数+++{count}")
-        count = 0
+            if random3 < 0.33:  # 10% 的概率
+                device0.initialize_task_dag('task_type3', args, env)
+                count = count + 1
+            if count < 1:
+                device0.initialize_task_dag('task_type1', args, env)
+            # print(f"+++到达任务数+++{count}")
+            count = 0
 
         if actions:
             # random.seed(args.seed)
@@ -448,36 +454,36 @@ if __name__ == "__main__":
         state, reward = env.get_next_state_and_reward(state, action) #这个里面会判断app是否已经完成
         actions = state.generate_actions()
         # env.update_running_tasks(state, 0)
-        for task_tuple in state.app_list:
-            app_DAG, app_type, app_device, arriving_time = task_tuple
-            print("*************************+++++++++其中一个任务++++++++**************************")
-            print("app种类" + str(app_type))
-            print("所属设备"+str(app_device))
-            print("到达时间"+str(arriving_time))
-            app_DAG.print_adjacency_list()
-            print("scheduled flag:")
-            print(app_DAG.task_node_scheduled_flag)
-            print("finished flag:")
-            print(app_DAG.task_node_finished_flag)
-            print("finished time:")
-            print(app_DAG.task_node_finished_time)
-            print("scheduled seq:")
-            print(app_DAG.task_node_scheduled_seq)
-            print("app finished time")
-            print(app_DAG.app_finished_time)
-
-
-        print("***************************************************")
-        for task in state.ready_tasks:
-            task_node, app_device, arriving_time, node_id, appID = task
-            print("所属设备"+str(app_device))
-            print("到达时间"+str(arriving_time))
-            print("任务ID:" + str(node_id))
-            print("所属AppID:" + str(appID))
-            task_node.print_task_info()
-            print("***************************************************")
-            actions = state.generate_actions()
-            state.print_actions(actions)
+        # for task_tuple in state.app_list:
+        #     app_DAG, app_type, app_device, arriving_time = task_tuple
+        #     print("*************************+++++++++其中一个任务++++++++**************************")
+        #     print("app种类" + str(app_type))
+        #     print("所属设备"+str(app_device))
+        #     print("到达时间"+str(arriving_time))
+        #     app_DAG.print_adjacency_list()
+        #     print("scheduled flag:")
+        #     print(app_DAG.task_node_scheduled_flag)
+        #     print("finished flag:")
+        #     print(app_DAG.task_node_finished_flag)
+        #     print("finished time:")
+        #     print(app_DAG.task_node_finished_time)
+        #     print("scheduled seq:")
+        #     print(app_DAG.task_node_scheduled_seq)
+        #     print("app finished time")
+        #     print(app_DAG.app_finished_time)
+        #
+        #
+        # print("***************************************************")
+        # for task in state.ready_tasks:
+        #     task_node, app_device, arriving_time, node_id, appID = task
+        #     print("所属设备"+str(app_device))
+        #     print("到达时间"+str(arriving_time))
+        #     print("任务ID:" + str(node_id))
+        #     print("所属AppID:" + str(appID))
+        #     task_node.print_task_info()
+        #     print("***************************************************")
+        #     actions = state.generate_actions()
+        #     state.print_actions(actions)
         env.current_time += 1
         print(f"+++++++++++++++++++current_time:{env.current_time}+++++++++++++++++++++++")
 
