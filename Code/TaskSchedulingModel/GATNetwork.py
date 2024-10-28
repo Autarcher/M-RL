@@ -39,6 +39,13 @@ class GATModel(nn.Module):
         self._initialize_weights()
 
     def _initialize_weights(self):
+        # #0初始化
+        # for m in self.modules():
+        #     if isinstance(m, dglnn.GATConv):
+        #         for param in m.parameters():
+        #             nn.init.zeros_(param)
+
+        # Xavier初始化方法
         for m in self.modules():
             if isinstance(m, dglnn.GATConv):
                 for param in m.parameters():
@@ -46,6 +53,7 @@ class GATModel(nn.Module):
                         nn.init.xavier_uniform_(param)
                     else:
                         nn.init.zeros_(param)
+
 
     def forward(self, g, features):
         # First GAT layer

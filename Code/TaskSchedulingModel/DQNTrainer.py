@@ -4,7 +4,7 @@ from Code.TaskSchedulingModel.util.prioritized_replay_memory import  Prioritized
 import torch
 import argparse
 import random
-
+import os
 import numpy as np
 
 import dgl
@@ -13,7 +13,7 @@ import dgl
 
 
 #  definition of constants
-MEMORY_CAPACITY = 400
+MEMORY_CAPACITY = 300   #300
 GAMMA = 1
 STEP_EPSILON = 5000.0
 VALIDATION_SET_SIZE = 100
@@ -24,13 +24,13 @@ MAX_VAL = 1000000
 
 
 #测试训练轮次的参数
-UPDATE_TARGET_FREQUENCY = 20 #每学习多少次模型传递依次参数
+UPDATE_TARGET_FREQUENCY = 20 #每学习多少次模型传递依次参数  # 20
 
-EPISODE = 10
+EPISODE = 10000        #1000
 
-SYSTEM_MAX_TIMES = 200
+SYSTEM_MAX_TIMES = 200 #200
 
-LEARNING_STEPS = 5
+LEARNING_STEPS = 5  #5
 
 
 
@@ -97,7 +97,7 @@ class Trainer:
                 if appDAG.app_finished_time > 0:
                     sum_time += appDAG.app_finished_time - arriving_time
                     finished_tasks_num += 1
-            print(f"++++++++++++++++++++++++++++++++第{i}次(系统共运行{SYSTEM_MAX_TIMES}时间)训练结果++++++++++++++++++++++++++++")
+            print(f"++++++++++++++++++++++++++++++++第{i+1}次(系统共运行{SYSTEM_MAX_TIMES}时间)训练结果++++++++++++++++++++++++++++")
             if finished_tasks_num == 0:
                 print(f"完成的任务数{finished_tasks_num}")
                 print(f"平均响应时间:-1(没有任务完成)")
@@ -106,6 +106,29 @@ class Trainer:
                 print(f"完成的任务数{finished_tasks_num}")
                 print(f"平均响应时间:{sum_time / finished_tasks_num}")
                 print(f"总奖励为:{total_reward}")
+
+            #记录结果
+            # 确保 result 文件夹存在
+            result_folder = 'result'
+            os.makedirs(result_folder, exist_ok=True)
+
+            # 构造文件名
+            file_path = os.path.join(result_folder, 'training_results.txt')
+
+            with open(file_path, 'a') as result_file:
+                result_file.write(
+                    f"++++++++++++++++++++++++++++++++第{i+1}次(系统共运行{SYSTEM_MAX_TIMES}时间)训练结果++++++++++++++++++++++++++++\n")
+                if finished_tasks_num == 0:
+                    result_file.write(f"完成的任务数:{finished_tasks_num}\n")
+                    result_file.write(f"平均响应时间:-1(没有任务完成)\n")
+                    result_file.write(f"总奖励为:{total_reward}\n")
+                else:
+                    result_file.write(f"完成的任务数:{finished_tasks_num}\n")
+                    result_file.write(f"平均响应时间:{sum_time / finished_tasks_num}\n")
+                    result_file.write(f"总奖励为:{total_reward}\n")
+
+            # 打印存储的文件的绝对路径
+            print(f"结果文件已保存至: {os.path.abspath(file_path)}")
 
 
             env.env_clear()
@@ -168,6 +191,7 @@ class Trainer:
             total_reward = total_reward + reward
             if i % (UPDATE_TARGET_FREQUENCY/LEARNING_STEPS) == 0:
                 self.brain.update_target_model()
+                print("成功更新网络参数")
 
             print(f"第{i+1}轮的强化学习loss:{loss}\n")
         return total_reward
@@ -178,8 +202,8 @@ class Trainer:
 
         # 将 predictions 转换为 numpy 数组
         predictions = np.array(predictions)
-        # print("+++++++predictions+++++++")
-        # print(predictions)
+        print("+++++++predictions+++++++")
+        print(predictions)
 
         # 计算 softmax，将 predictions 转化为概率分布
         max_value = np.max(predictions)
@@ -188,8 +212,8 @@ class Trainer:
         # print(stabilized_predictions)
         softmax_probs = np.exp(stabilized_predictions) / np.sum(np.exp(stabilized_predictions))
 
-        # print("+++++++softmax_probs+++++++")
-        # print(softmax_probs)
+        print("+++++++softmax_probs+++++++")
+        print(softmax_probs)
         # 根据 softmax 概率选择动作
         action = np.random.choice(len(predictions), p=softmax_probs)
 

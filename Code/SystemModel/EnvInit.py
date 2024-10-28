@@ -253,8 +253,8 @@ class EnvInit:
 
         #得到奖励
         if action >= -1:
-            reward = (self.t_finished_apps_num * 100) + (self.t_finished_tasks_num * 2.5) + (
-                    self.t_add_runnings_tasks_num * -6)
+            reward = ((self.t_finished_apps_num * 100) + (self.t_finished_tasks_num * 5) + (
+                    self.t_add_runnings_tasks_num * -5))
         else:
             reward = -1
 
