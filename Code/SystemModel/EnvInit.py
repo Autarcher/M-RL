@@ -153,15 +153,17 @@ class EnvInit:
         :param device_type: 设备类型。
         :param args: 设备参数。
         """
-        if device_type == 'device_type1':
-            self.devices.append((Device(tuple(args.coordinates1), args.computing_speed1, args.channel_gain1,
-                                        available_time=args.available_time1), device_type, len(self.devices) + 1))
-        elif device_type == 'device_type2':
-            self.devices.append((Device(tuple(args.coordinates2), args.computing_speed2, args.channel_gain2,
-                                        available_time=args.available_time2), device_type, len(self.devices) + 1))
-        elif device_type == 'device_type3':
-            self.devices.append((Device(tuple(args.coordinates3), args.computing_speed3, args.channel_gain3,
-                                        available_time=args.available_time3), device_type, len(self.devices) + 1))
+        device_type = getattr(args, device_type)
+        coordinates = getattr(args, f"coordinates{device_type}")
+        computing_speed = getattr(args, f"computing_speed{device_type}")
+        channel_gain = getattr(args, f"channel_gain{device_type}")
+        available_time = getattr(args, f"available_time{device_type}")
+
+        self.devices.append((Device(tuple(coordinates), computing_speed, channel_gain,
+                                        available_time=available_time),
+                                        device_type,
+                                        len(self.devices) + 1))
+
 
     # def initialize_task_dag(self, task_type, args):
     #     """
@@ -235,7 +237,9 @@ class EnvInit:
         """
         self.update_running_tasks(state, action)
 
-
+        finished_task1_num = 0
+        finished_task2_num = 0
+        finished_task3_num = 0
         for running_task in self.running_tasks:
             if running_task[2] <= self.current_time:
                 task_node, _, finished_time, node_id, appID = running_task
@@ -243,18 +247,26 @@ class EnvInit:
                 self.tasks[appID][0].task_node_finished_time[node_id] = finished_time
                 self.t_finished_tasks_num += 1
 
-                #如果时出口任务那么记录这个任务的结束时间
+                #如果是出口任务那么记录这个任务的结束时间
                 if node_id == len(self.tasks[appID][0].nodes) - 1:
                     self.tasks[appID][0].app_finished_time = finished_time
                     self.t_finished_apps_num += 1
+
+                    appDAG = self.tasks[appID][0]
+                    if appDAG.task_type == 1:
+                        finished_task1_num += 1
+                    elif appDAG.task_type == 2:
+                        finished_task2_num += 1
+                    elif appDAG.task_type == 3:
+                        finished_task3_num += 1
 
                 self.running_tasks.remove(running_task)
         state = self.get_state()
 
         #得到奖励
         if action >= -1:
-            reward = ((self.t_finished_apps_num * 100) + (self.t_finished_tasks_num * 5) + (
-                    self.t_add_runnings_tasks_num * -5))
+            reward = (self.t_finished_apps_num * 50 +
+                    self.t_add_runnings_tasks_num * -5 + finished_task1_num * 50 + finished_task2_num * 50 + finished_task3_num * 50)
         else:
             reward = -1
 
@@ -314,7 +326,7 @@ def parse_arguments():
     # TaskDAG parameters for dag type 3
     parser.add_argument('--task_type3', type=int, default=3, help="DAG图的种类")
     parser.add_argument('--seed3', type=int, default=3, help="随机种子")
-    parser.add_argument('--num_nodes3', type=int, default=12, help="DAG图的节点数量")
+    parser.add_argument('--num_nodes3', type=int, default=9, help="DAG图的节点数量")
 
     # Common TaskDAG parameters
     parser.add_argument('--data_range', type=tuple, default=(100, 1000), help="数据量范围：100字节到1000字节")

@@ -4,7 +4,7 @@ from Code.SystemModel.TaskModel import TaskNode
 
 
 class TaskDAG:
-    def __init__(self, num_nodes, data_range, computation_range, deadline_range, seed, current_time):
+    def __init__(self, num_nodes, data_range, computation_range, deadline_range, seed, task_type, task_basis_nodes):
         """
         初始化DAG图，生成指定节点数量的任务节点。
         :param num_nodes: 任务节点的数量
@@ -12,12 +12,14 @@ class TaskDAG:
         :param computation_range: 计算量范围（如 (min_computation_size, max_computation_size)）
         :param deadline_range: 截止时间范围（如 (min_deadline, max_deadline)）
         """
-        random.seed(seed)
+        self.random_instance = random.Random(seed)
         self.num_nodes = num_nodes
         self.data_range = data_range
         self.computation_range = computation_range
         self.deadline_range = deadline_range
+        self.task_type = task_type
         # self.arriving_time = current_time #任务的发起时间
+        self.balance = task_basis_nodes/num_nodes
 
         self.nodes = []  # 存储所有生成的 TaskNode
         self.task_node_finished_flag = []  # 标识任务是否已经被完成
@@ -51,9 +53,9 @@ class TaskDAG:
 
         # 生成指定数量的 TaskNode
         for i in range(1, self.num_nodes + 1):
-            data_size = random.randint(self.data_range[0], self.data_range[1])
-            computation_size = random.uniform(self.computation_range[0], self.computation_range[1])
-            deadline = random.randint(self.deadline_range[0], self.deadline_range[1])
+            data_size = self.random_instance.randint(self.data_range[0], self.data_range[1]) * self.balance
+            computation_size = self.random_instance.uniform(self.computation_range[0], self.computation_range[1]) * self.balance
+            deadline = self.random_instance.randint(self.deadline_range[0], self.deadline_range[1])
 
             # 创建 TaskNode 实例并添加到节点列表中
             task_node = TaskNode(data_size, computation_size, deadline)
@@ -76,8 +78,8 @@ class TaskDAG:
         # 使用新的逻辑生成依赖关系，确保生成合理的DAG结构
         for i in range(1, self.num_nodes + 1):
             possible_dependencies = list(range(0, i))  # 节点可以依赖于之前的所有节点（包括入口任务）
-            num_dependencies = random.randint(1, min(3, len(possible_dependencies)))  # 随机选择1到3个前驱节点
-            dependencies = random.sample(possible_dependencies, num_dependencies)
+            num_dependencies = self.random_instance.randint(1, min(3, len(possible_dependencies)))  # 随机选择1到3个前驱节点
+            dependencies = self.random_instance.sample(possible_dependencies, num_dependencies)
             self.adjacency_list[i] = dependencies
 
         # 所有没有后继任务的节点（即没有其他任务依赖它们的）依赖于出口任务

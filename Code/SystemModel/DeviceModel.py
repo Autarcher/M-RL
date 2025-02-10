@@ -117,20 +117,15 @@ class Device:
         :param task_type: DAG类型。
         :param args: 任务DAG参数。
         """
-        if task_type == 'task_type1':
-            task_dag = TaskDAG(num_nodes=args.num_nodes1, data_range=args.data_range,
+        task_type = getattr(args, task_type)
+        task_dag = TaskDAG(num_nodes=getattr(args, f"num_nodes{task_type}"),
+                                data_range=args.data_range,
                                computation_range=args.computation_range,
-                               deadline_range=args.deadline_range, seed=args.seed1, current_time=env.current_time)
-        elif task_type == 'task_type2':
-            task_dag = TaskDAG(num_nodes=args.num_nodes2, data_range=args.data_range,
-                               computation_range=args.computation_range,
-                               deadline_range=args.deadline_range, seed=args.seed2, current_time=env.current_time)
-        elif task_type == 'task_type3':
-            task_dag = TaskDAG(num_nodes=args.num_nodes3, data_range=args.data_range,
-                               computation_range=args.computation_range,
-                               deadline_range=args.deadline_range, seed=args.seed3, current_time=env.current_time)
-
-        arrival_time = random.randint(0, 100)  # 随机生成任务到达时间
+                               deadline_range=args.deadline_range,
+                               seed=getattr(args, f"seed{task_type}"),
+                               task_type = task_type,
+                               task_basis_nodes = args.task_basis_nodes)
+        #arrival_time = random.randint(0, 100)  # 随机生成任务到达时间
         env.tasks.append((task_dag, task_type, 0, env.current_time))  # 第一个元素是任务的DAG图，第二个元素表示任务的所属设备，第三个是属于哪个设备，第四给变量表示为任务的到达时间
 
 # 主函数，创建设备和任务，选择最优设备进行任务卸载
