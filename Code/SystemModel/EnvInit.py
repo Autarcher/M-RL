@@ -319,18 +319,19 @@ def parse_arguments():
     # Common TaskDAG parameters
     parser.add_argument('--data_range', type=tuple, default=(100, 1000), help="数据量范围：100字节到1000字节")
     #default=(1e8, 1e10)
-    parser.add_argument('--computation_range', type=tuple, default=(1e6, 1e8), help="计算量范围：1亿FLOPs到100亿FLOPs")
+    parser.add_argument('--computation_range', type=tuple, default=(1e6, 1e7), help="计算量范围：1亿FLOPs到100亿FLOPs")
     parser.add_argument('--deadline_range', type=tuple, default=(100, 1000), help="截止时间范围：100秒到1000秒")
 
     # Hyper parameters
     parser.add_argument('--seed', type=int, default=1, help="模型的初始化种子")
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.000005)
+    parser.add_argument('--learning_rate', type=float, default=0.005)
     parser.add_argument('--n_step', type=int, default=600)
     parser.add_argument('--n_time_slot', type=int, default=300)
     parser.add_argument('--max_softmax_beta', type=int, default=10, help="max_softmax_beta")
     parser.add_argument('--hidden_layer', type=int, default=32)
-    parser.add_argument('--latent_dim', type=int, default=128, help='dimension of latent layers')
+    parser.add_argument('--latent_dim', type=int, default=64, help='dimension of latent layers')
+    parser.add_argument('--num_node_feats', type=int, default=15, help="The features dimension of a node")
 
     # Argument for Trainer
     parser.add_argument('--n_episode', type=int, default=10000)
@@ -446,8 +447,8 @@ if __name__ == "__main__":
             random.seed(seed)
             random_action = random.randint(0, len(actions) - 1)
             # env.update_running_tasks(state, random_action)
-            action = random_action
-            # action = 0
+            # action = random_action
+            action = 0
         else:
             action = -2
 
@@ -519,9 +520,11 @@ if __name__ == "__main__":
     #Exploration setp
     print("*******************************测试get_next_state函数完毕*******************************")
 
-
     sum_time = 0
     finished_tasks_num = 0
+    finished_task1_num = 0
+    finished_task2_num = 0
+    finished_task3_num = 0
     for index, app in enumerate(env.tasks):
         appDAG, _, _, arriving_time = app
         print(f"第{index}个任务的到达时刻是{arriving_time}的完成时刻是{appDAG.app_finished_time},"
@@ -529,12 +532,20 @@ if __name__ == "__main__":
         if appDAG.app_finished_time > 0:
             sum_time += appDAG.app_finished_time - arriving_time
             finished_tasks_num += 1
-
+            if appDAG.task_type == 1:
+                finished_task1_num += 1
+            elif appDAG.task_type == 2:
+                finished_task2_num += 1
+            elif appDAG.task_type == 3:
+                finished_task3_num += 1
     if finished_tasks_num == 0:
         print(f"完成的任务数{finished_tasks_num}")
+        print(f"完成数1类任务：{finished_task1_num},2类任务：{finished_task2_num},3类任务：{finished_task3_num}")
         print(f"平均响应时间:-1(没有任务完成)")
+
     else:
         print(f"完成的任务数{finished_tasks_num}")
+        print(f"1类任务：{finished_task1_num},2类任务：{finished_task2_num},3类任务：{finished_task3_num}")
         print(f"平均响应时间:{sum_time / finished_tasks_num}")
     print(f"seed:{seed}")
 
